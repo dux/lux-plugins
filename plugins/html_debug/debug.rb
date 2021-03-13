@@ -1,5 +1,5 @@
-class Lux::Template
-  def self.wrap_with_debug_info files, data
+module Lux
+  def Template.wrap_with_debug_info files, data
     return data unless Lux.current.request.env['QUERY_STRING'].include?('debug=render')
 
     files = [files] unless files.is_a?(Array)
@@ -10,8 +10,8 @@ class Lux::Template
       %[<a href="subl://open?url=file:/%s" style="color: #fff;" onmousedown="setTimeout(function() { $('#debug-toggle').click() }, 300)">%s%s</a>] % [Url.escape(Lux.root.join(file).to_s), file.split(':').first, prefix]
     end.join(' &bull; ')
 
-    %[<div style="margin: 10px; border: 1px solid #800;">
-      <span style="background-color: #800; color: #fff; padding: 3px; font-size:14px; position: relative; top: -3px;">#{files}</span>
+    %[<div style="margin: 5px; border: 1px solid #800;">
+      <span style="background-color: #800; color: #fff; padding: 2px 5px; font-size:14px; position: relative; top: -2px;">#{files}</span>
       <br />
       #{data}
     </div>]
@@ -69,14 +69,6 @@ module Lux::Template::DebugPlugin
   end
 end
 
-# add info to cell templates
-module Lux::ViewCell::DebugPlugin
-  def template *args
-    Lux::Template.wrap_with_debug_info caller.first, super
-  end
-end
-
 if Lux.env.dev?
   Lux::Template.prepend Lux::Template::DebugPlugin
-  Lux::ViewCell.prepend Lux::ViewCell::DebugPlugin
 end
