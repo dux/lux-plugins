@@ -18,6 +18,7 @@ namespace :assets do
   desc 'Build and generate manifest'
   task :compile do
     Lux.run 'rm -rf public/assets'
+    Lux.run 'bundle exec lux cerb'
     Lux.run 'rollup -c --compact' # --context window
 
     for css in Dir.files('app/assets').select { |it| it.ends_with?('.css') || it.ends_with?('.scss') }

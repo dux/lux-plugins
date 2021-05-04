@@ -70,14 +70,14 @@ namespace :db do
   task :am do
     class Object
       def self.const_missing klass, path=nil
-        eval 'class ::%s; end' % klass
+        eval 'class ::%s; end' % klass,  __FILE__, __LINE__
         Object.const_get(klass)
       end
     end
 
     Lux.config.migrate = true
 
-    load Lux.fw_root.join('plugins/db/auto_migrate/auto_migrate.rb').to_s
+    load '%s/auto_migrate/auto_migrate.rb' % Lux.plugin(:db).folder
 
     # Sequel extension and plugin test
     DB.run %[DROP TABLE IF EXISTS lux_tests;]

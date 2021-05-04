@@ -109,12 +109,15 @@ namespace :db do
       exit
     end
 
-    desc "Load seeds from db/seeds"
+    desc "Load seeds from db/seeds/* or db/seeds.rb"
     task load: :app do
       for file in Dir['db/seeds/*'].sort
         puts file.green
         load file
       end
+
+      seeds = Pathname.new 'db/seeds.rb'
+      load seeds.read if seeds.exist?
     end
   end
 end
