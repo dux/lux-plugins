@@ -48,17 +48,19 @@ Object.assign Svelte,
         props: {
           ...opts,
           node: node,
-          html: node.innerHTML
+          html: if /\w+/.test(String(node.innerHTML)) then node.innerHTML else ''
         }
       }
 
       node.innerHTML = ''
 
-      element = new svelte_klass({ target: node, props: in_opts })
-      node.svelte = element
+      svelte_node = new svelte_klass({ target: node, props: in_opts })
+      node.svelte = svelte_node
 
-      if element.windowGlobal
-        window[element.windowGlobal] = element
+      # export const component = { global: 'Dialog' }
+      if c = svelte_node.component
+        if c.global
+          window[c.global] = svelte_node
 
 # create DOM custom element or polyfil for older browsers
 window.CustomElement =
@@ -82,6 +84,8 @@ window.CustomElement =
 
     if window.customElements
       customElements.define name, class extends HTMLElement
+        attributeChangedCallback: (name, oldValue, newValue) ->
+          console.log('attributeChangedCallback', name, oldValue, newValue)
         connectedCallback: ->
           window.requestAnimationFrame =>
             func @, CustomElement.attributes(@)

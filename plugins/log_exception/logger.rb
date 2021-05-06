@@ -25,9 +25,7 @@ module Lux
 
         File.write("#{folder}/#{key}.txt", data)
 
-        rr Lux.logger(:exceptions)
-
-        # Lux.logger(:exceptions).error [key, User.current.try(:email).or('guest'), error.message].join(' - ')
+        Lux.logger(:exceptions).error [key, User.current.try(:email).or('guest'), exception.message].join(' - ')
 
         key
       end
