@@ -1,31 +1,23 @@
+# make new class PjaxPage, work with that
+
 # How to use?
 
 # Pjax will replace only contents of MAIN HTML tag
 # HTML <main> Tag
 # https://www.w3schools.com/tags/tag_main.asp
 
-# Pjax.keep_scrool('.no-scroll', '.menu-heading', '.skill', ()=>{ ... })
+# Pjax.no_scroll('.no-scroll', '.menu-heading', '.skill', ()=>{ ... })
 # set meta[name=pjax_template_id] in header, and full reaload page on missmatch
 # Pjax.init -> ... -> function to execute after every page load
 
-# handle back button gracefully
-window.onpopstate = (event) ->
-  if event.state && event.state.data
-    Pjax.console "Pjax.load #{Pjax.path()} (popstate trigger, cache hit)"
-    Pjax.replace event.state.title, event.state.data
-  else
-    Pjax.load Pjax.path(), no_history: true
-
-window.Pjax =
-class Pjax
-  @abort_message  = 'Pjax request aborted'
-  @silent         = false
-  @fresh          = true                    # if page has not been refreshed
+window.Pjax = class Pjax
+  @config =
+    silent: false
   @no_scroll_list = []
   @before_test    = []
   @paths_to_skip  = []
-  @preloaded      = {}
 
+  # base class method to load page
   @load: (href, opts) ->
     if Pjax.noCache
       Pjax.noCache  = false
@@ -39,31 +31,28 @@ class Pjax
   @path: ->
     location.pathname+location.search
 
-  # replace title and body on page refresh
-  @replace: (title, body) ->
-    # replace document title
-    document.title = title
+  # refresh page, keep scrool
+  @refresh: (func) ->
+    Pjax.load(Pjax.path(), { no_scroll: true, done: func })
 
-    # replace document body
-    main = $('main')
-    @info "%main tag not defined in document" unless main[0]
-    main.html body
+  # reload, jump to top, no_cache http request forced
+  @reload: (func) ->
+    Pjax.load(Pjax.path(), { no_cache: true, done: func })
 
-  # set page path with history
-  # Pjax.set '/foo'
-  @set: (path) ->
-    title = document.title
-    main  = document.getElementsByTagName('main')[0].innerHTML
-    window.history.pushState({ title: title, data: main}, title, path)
+  @node: ->
+    document.getElementsByTagName('pjax')[0] || document.getElementsByClassName('pjax')[0]
 
+  # send info to a client
   @info: (data) ->
-    return if @silent
+    return if @config.silent
+
     msg = "Pjax info: #{data}"
-    @console.log msg
+    console.log msg
     alert msg
 
   @console: (msg) ->
-    console.log msg unless @silent
+    unless @config.silent
+      console.log msg
 
   # what to do on request error
   @on_error: (ret) ->
@@ -77,21 +66,13 @@ class Pjax
   #       Dialog.load href
   #       return false
   #   true
-  @before: (func) -> @before_test.push func
+  @before: (func) ->
+    @before_test.push func
 
-  # do not scroll to top, use refresh() and not reload()
-  # Pjax.keep_scrool('.no-scroll', '.menu-heading', '.skill')
-  @keep_scrool: -> @no_scroll_list = arguments
-
-  # set the no scroll list
+  # do not scroll to top, use refresh() and not reload() on node with classes
+  # Pjax.no_scroll('.no-scroll', '.menu-heading', '.skill')
   @no_scroll: ->
     @no_scroll_list = arguments
-
-  # refresh page, keep scrool
-  @refresh: (func)   -> Pjax.load(Pjax.path(), { no_scroll: true, done: func })
-
-  # reload, jump to top, no_cache http request forced
-  @reload: (func)    -> Pjax.load(Pjax.path(), { no_cache: true, done: func })
 
   @no_scroll_check: (node) ->
     return unless node && node.closest
@@ -116,28 +97,25 @@ class Pjax
     @init_ok = true
 
     # if page change fuction provided, store it and run it
-    if func
-      @init_func = func
-      document.addEventListener "DOMContentLoaded", -> func()
+    @after = func if func
 
   # replace with real page reload init func
-  @init_func: -> true
+  @after: -> true
 
   ###########
 
   constructor: (@href, @opts) ->
     true
 
+  redirect: ->
+    location.href = @href
+    false
+
   # load a new page
   load: ->
     @info 'You did not use Pjax.init()' unless Pjax.init_ok
 
     return false unless @href
-
-    if Pjax.preloaded[@href] && !@opts.preload
-      Pjax.preloaded[@href]()
-      delete Pjax.preloaded[@href]
-      return
 
     @href = location.pathname + @href if @href[0] == '?'
 
@@ -162,8 +140,6 @@ class Pjax
     headers['cache-control'] = 'no-cache' if @opts.no_cache
     headers['x-requested-with'] = 'XMLHttpRequest'
 
-    @opts.pjax_template_id = @template_id()
-
     if Pjax.request
       Pjax.request.abort()
 
@@ -171,99 +147,123 @@ class Pjax
 
     @req.onerror = (e) ->
       Pjax.error 'Net error: Server response not received (Pjax)'
-      Pjax.console.error(e)
+      console.error(e)
 
     @req.open('GET', @href)
     @req.setRequestHeader k, v for k,v of headers
-    @req.send()
+
     @req.onload = (e) =>
-      Pjax.fresh = false
       @response  = @req.responseText
 
       # if not 200, redirect to page to show the error
       if @req.status != 200
         Pjax.console("Pjax status: #{@request.status}")
         location.href = @href
-        return false
-
-      Pjax.last_path = @href
-
-      # fix href because of redirects
-      if rul = @req.responseURL
-        @href = rul.split('/')
-        @href.splice(0,3)
-        @href = '/' + @href.join('/')
-
-      if Pjax.preload
-        Pjax.preloaded[@href] = =>
-          @replace_page()
       else
-        @replace_page()
+        # fix href because of redirects
+        if rul = @req.responseURL
+          @href = rul.split('/')
+          @href.splice(0,3)
+          @href = '/' + @href.join('/')
+
+        # console log
+        time_diff = (new Date()).getTime() - @opts.req_start_time
+        log_data  = "Pjax.load #{@href}"
+        log_data += if @opts.no_history then ' (back trigger)' else ''
+        Pjax.console "#{log_data} (app #{@req.getResponseHeader('x-lux-speed')}, real #{time_diff}ms)"
+
+        # inject response in current page and process if ok
+        if ResponsePage.inject(@response, @href)
+          # add history
+          PjaxHistory.addCurrent(@href) unless @opts.no_history
+
+          # trigger init func if one provided on init
+          Pjax.after()
+
+          # trigger opts['done'] function
+          @opts.done() if typeof(@opts.done) == 'function'
+
+          # scroll to top of the page unless defined otherwise
+          unless @opts.no_scroll || Pjax.no_scroll_check(@opts.node)
+            window.scrollTo(0, 0)
+
+    @req.send()
 
     false
 
-  # # # private methods # # #
+#
 
-  replace_page: ->
-    # extract data
-    main   = @extract('main').HTML || @info("<main> tag not defined in recieved page")
-    title  = @extract('title').HTML
-    header = @extract('head').HTML
+class ResponsePage
+  @inject: (response, href) ->
+    response_page = new ResponsePage response
+    response_page.inject_in_current(href)
 
-    # this has to happen before body change
-    unless @opts.no_history
-      # push new empty data state, just ot change url
-      window.history.pushState({ title: title, data: main}, title, @href)
-
-    # console log
-    time_diff = (new Date()).getTime() - @opts.req_start_time
-    log_data  = "Pjax.load #{@href}"
-    log_data += if @opts.no_history then ' (back trigger)' else ''
-    Pjax.console "#{log_data} (app #{@req.getResponseHeader('x-lux-speed')}, real #{time_diff}ms)"
-
-    if @opts.pjax_template_id != @template_id(header)
-      Pjax.console 'Pjax: Template ID missmatch, full load'
-      document.head.innerHTML = header
-      document.body.innerHTML = @extract('body').HTML
+  @set: (title, main_data) ->
+    if main_node = Pjax.node()
+      document.title      = title || 'no page title (pjax)'
+      main_node.innerHTML = main_data
     else
-      # replace title and body
-      Pjax.replace title, main
+      Pjax.info 'No pjax node?'
 
-    # trigger init func if one provided on init
-    Pjax.init_func()
+  #
 
-    @opts.done() if typeof(@opts.done) == 'function'
+  constructor: (@response) ->
+    @page = document.createElement('div')
+    @page.innerHTML = @response
 
-    # scroll to top of the page unless defined otherwise
-    unless @opts.no_scroll || Pjax.no_scroll_check(@opts.node)
-      window.scrollTo(0, 0)
+  node: ->
+    @page.getElementsByTagName('pjax')[0] ||
+    @page.getElementsByClassName('pjax')[0] ||
+    alert('No <pjax id="foo"> or <div class="pjax" id="foo"> node in response page')
 
-  # get pjax template id
-  template_id: (data) ->
-    node = document.head
-
-    if data
-      node = document.createElement('div')
-      node.innerHTML = data
-
-    if meta = node.querySelector('meta[name=pjax_template_id]')
-      meta.content
-    else
-      null
-
-  redirect: ->
-    location.href = @href
-    false
-
-  # extract node as object from html data
+  # extract node html + attributes as object from html data
   extract: (node_name) ->
     out = {}
 
-    match = new RegExp("<#{node_name}([^>]*)>([^§]+)</#{node_name}>")
-    if match.test(@response)
-      attrs    = RegExp.$1
-      out.HTML = RegExp.$2
-      attrs.replace /([\-\w]+)=['"]([^'"]+)/, ->
-        out[RegExp.$1] = RegExp.$2
+    if node = @page.querySelector(node_name)
+      out['HTML'] = node.innerHTML
+
+      for name in node.getAttributeNames()
+        out[name] = node.getAttribute(name)
 
     out
+
+  # replace title and main block
+  inject_in_current: (href) ->
+    node = @node()
+
+    if node.id
+      if node.id == Pjax.node().id
+        ResponsePage.set @extract('title').HTML, node.innerHTML
+        Pjax.after()
+        return true
+      else
+        console.log 'Pjax: template_id mismatch, full page load'
+        # document.write @response is buggy and unsafe
+        # do full reload
+        location.href = href
+    else
+      alert 'No IN on pjax node (<pjax id="main">...)'
+
+    false
+
+#
+
+class PjaxHistory
+  # add current page to history
+  @addCurrent: (href) ->
+    title = document.title
+    main  = Pjax.node().innerHTML
+
+    window.history.pushState({ title: title, main: main }, title, href)
+
+  @loadFromHistory: (event) ->
+    if event.state.main
+      ResponsePage.set event.state.title, event.state.main
+      Pjax.after()
+    else
+      Pjax.load Pjax.path(), no_history: true
+
+# handle back button gracefully
+window.onpopstate = PjaxHistory.loadFromHistory
+

@@ -52,7 +52,6 @@ doc_on_click = ->
   else
     Pjax.load href, node: node[0]
 
-
   false
 
 $(document).on 'click', (event), doc_on_click

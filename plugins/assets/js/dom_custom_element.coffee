@@ -83,12 +83,13 @@ window.CustomElement =
     @registred[name] = func
 
     if window.customElements
-      customElements.define name, class extends HTMLElement
-        attributeChangedCallback: (name, oldValue, newValue) ->
-          console.log('attributeChangedCallback', name, oldValue, newValue)
-        connectedCallback: ->
-          window.requestAnimationFrame =>
-            func @, CustomElement.attributes(@)
+      unless customElements.get(name)
+        customElements.define name, class extends HTMLElement
+          attributeChangedCallback: (name, oldValue, newValue) ->
+            console.log('attributeChangedCallback', name, oldValue, newValue)
+          connectedCallback: ->
+            window.requestAnimationFrame =>
+              func @, CustomElement.attributes(@)
     else
       @un_registred[name] = func
 

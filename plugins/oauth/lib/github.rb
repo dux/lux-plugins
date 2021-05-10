@@ -33,8 +33,6 @@ class LuxOauth::Github < LuxOauth
     opts     = { Authorization: 'token %s' % access_token, accept: :json }
     response = RestClient.get('https://api.github.com/user', opts).body
 
-    binding.pry
-
     Lux.logger(:oauth).info [:github, response].join(' - ')
 
     opts = JSON.parse(response)
