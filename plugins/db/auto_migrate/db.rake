@@ -39,13 +39,27 @@ namespace :db do
 
   desc 'Reset database from db/seed.sql'
   task :reset do
-    seed = Pathname.new './tmp/db_dump/seed.sql'
-    Lux.die '%s not found' % seed unless seed.exist?
-
     invoke  'db:drop'
     invoke  'db:create'
-    Lux.run "psql #{db_name} < #{seed}"
-    Lux.run "psql #{db_name}_test < #{seed}"
+
+    seed = Pathname.new './tmp/db_dump/seed.sql'
+
+    if seed.exist?
+      Lux.info 'Seed "%s" found' % seed
+      Lux.run "psql #{db_name} < #{seed}"
+      Lux.run "psql #{db_name}_test < #{seed}"
+    else
+      Lux.info 'Seed "%s" not found' % seed
+      invoke  'db:am'
+    end
+  end
+
+  desc 'Load seed from ./db/seeds '
+  task :seed do
+    for file in Dir['db/seeds/*'].sort
+      puts 'Seed: %s' % file.green
+      load file
+    end
   end
 
   desc 'Create database'
@@ -91,7 +105,9 @@ namespace :db do
 
     run_all_in_folder './db/before'
 
-    for klass in Typero.schema(type: :model)
+    klasses = Typero.schema(type: :model) || raise(StandardError.new('Typero schemas not loaded'))
+
+    for klass in klasses
       AutoMigrate.typero klass
     end
 

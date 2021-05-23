@@ -91,7 +91,7 @@ class HtmlTable
 
             th_opts[:style] = style.join('; ') if style.first
 
-            title  = opts[:title]
+            title = opts[:title]
             title = opts[:field].to_s.humanize if title.nil? && opts[:field]
 
             if sort = opts[:sort]

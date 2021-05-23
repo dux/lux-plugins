@@ -11,8 +11,7 @@
 # Pjax.init -> ... -> function to execute after every page load
 
 window.Pjax = class Pjax
-  @config =
-    silent: false
+  @is_silent      = false
   @no_scroll_list = []
   @before_test    = []
   @paths_to_skip  = []
@@ -44,14 +43,12 @@ window.Pjax = class Pjax
 
   # send info to a client
   @info: (data) ->
-    return if @config.silent
-
     msg = "Pjax info: #{data}"
     console.log msg
-    alert msg
+    alert msg unless @is_silent
 
   @console: (msg) ->
-    unless @config.silent
+    unless @is_silent
       console.log msg
 
   # what to do on request error
@@ -97,7 +94,10 @@ window.Pjax = class Pjax
     @init_ok = true
 
     # if page change fuction provided, store it and run it
-    @after = func if func
+    if func
+      document.addEventListener 'DOMContentLoaded', ->
+        Pjax.after = func
+        func()
 
   # replace with real page reload init func
   @after: -> true
@@ -108,7 +108,13 @@ window.Pjax = class Pjax
     true
 
   redirect: ->
-    location.href = @href
+    if Pjax.use_document_write
+      document.open()
+      document.write(@response)
+      document.close()
+    else
+      location.href = @href
+
     false
 
   # load a new page
@@ -155,10 +161,15 @@ window.Pjax = class Pjax
     @req.onload = (e) =>
       @response  = @req.responseText
 
+      # console log
+      time_diff = (new Date()).getTime() - @opts.req_start_time
+      log_data  = "Pjax.load #{@href}"
+      log_data += if @opts.no_history then ' (back trigger)' else ''
+      Pjax.console "#{log_data} (app #{@req.getResponseHeader('x-lux-speed') || 'n/a'}, real #{time_diff}ms, status #{@req.status})"
+
       # if not 200, redirect to page to show the error
       if @req.status != 200
-        Pjax.console("Pjax status: #{@request.status}")
-        location.href = @href
+        @redirect()
       else
         # fix href because of redirects
         if rul = @req.responseURL
@@ -166,19 +177,14 @@ window.Pjax = class Pjax
           @href.splice(0,3)
           @href = '/' + @href.join('/')
 
-        # console log
-        time_diff = (new Date()).getTime() - @opts.req_start_time
-        log_data  = "Pjax.load #{@href}"
-        log_data += if @opts.no_history then ' (back trigger)' else ''
-        Pjax.console "#{log_data} (app #{@req.getResponseHeader('x-lux-speed')}, real #{time_diff}ms)"
+        unless @opts.no_history
+          PjaxHistory.replaceState()
 
         # inject response in current page and process if ok
-        if ResponsePage.inject(@response, @href)
+        if ResponsePage.inject(@response)
           # add history
-          PjaxHistory.addCurrent(@href) unless @opts.no_history
-
-          # trigger init func if one provided on init
-          Pjax.after()
+          unless @opts.no_history
+            PjaxHistory.addCurrent(@href)
 
           # trigger opts['done'] function
           @opts.done() if typeof(@opts.done) == 'function'
@@ -186,6 +192,10 @@ window.Pjax = class Pjax
           # scroll to top of the page unless defined otherwise
           unless @opts.no_scroll || Pjax.no_scroll_check(@opts.node)
             window.scrollTo(0, 0)
+        else
+          # document.write @response is buggy and unsafe
+          # do full reload
+          @redirect()
 
     @req.send()
 
@@ -194,16 +204,28 @@ window.Pjax = class Pjax
 #
 
 class ResponsePage
-  @inject: (response, href) ->
+  @inject: (response) ->
     response_page = new ResponsePage response
-    response_page.inject_in_current(href)
+    response_page.inject_in_current()
 
   @set: (title, main_data) ->
     if main_node = Pjax.node()
       document.title      = title || 'no page title (pjax)'
       main_node.innerHTML = main_data
+      @parseScripts()
+
     else
       Pjax.info 'No pjax node?'
+
+  @parseScripts: () ->
+    for script_tag in Pjax.node().getElementsByTagName('script')
+      next if script_tag.getAttribute('src') || !script_tag.innerText
+      type = script_tag.getAttribute('type') || 'javascript'
+
+      if type.indexOf('javascript') > -1
+        func = new Function script_tag.innerText
+        func()
+        script_tag.innerText = '1;'
 
   #
 
@@ -212,9 +234,7 @@ class ResponsePage
     @page.innerHTML = @response
 
   node: ->
-    @page.getElementsByTagName('pjax')[0] ||
-    @page.getElementsByClassName('pjax')[0] ||
-    alert('No <pjax id="foo"> or <div class="pjax" id="foo"> node in response page')
+    @page.getElementsByTagName('pjax')[0] || @page.getElementsByClassName('pjax')[0]
 
   # extract node html + attributes as object from html data
   extract: (node_name) ->
@@ -229,8 +249,10 @@ class ResponsePage
     out
 
   # replace title and main block
-  inject_in_current: (href) ->
-    node = @node()
+  inject_in_current: ->
+    unless node = @node()
+      Pjax.info('No <pjax id="foo"> or <div class="pjax" id="foo"> node in response page')
+      return false
 
     if node.id
       if node.id == Pjax.node().id
@@ -238,10 +260,7 @@ class ResponsePage
         Pjax.after()
         return true
       else
-        console.log 'Pjax: template_id mismatch, full page load'
-        # document.write @response is buggy and unsafe
-        # do full reload
-        location.href = href
+        Pjax.info 'template_id mismatch, full page load'
     else
       alert 'No IN on pjax node (<pjax id="main">...)'
 
@@ -250,12 +269,12 @@ class ResponsePage
 #
 
 class PjaxHistory
+  @replaceState: ->
+    window.history.replaceState({ title: document.title, main: Pjax.node().innerHTML }, document.title, location.href)
+
   # add current page to history
   @addCurrent: (href) ->
-    title = document.title
-    main  = Pjax.node().innerHTML
-
-    window.history.pushState({ title: title, main: main }, title, href)
+    window.history.pushState({ title: document.title, main: Pjax.node().innerHTML }, document.title, href)
 
   @loadFromHistory: (event) ->
     if event.state.main

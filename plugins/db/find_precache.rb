@@ -7,7 +7,7 @@
 #   .precache(:org_id)
 
 ApplicationModel.class_eval do
-  class_attribute :cache_ttl
+  cattr :cache_ttl, nil
 end
 
 #
@@ -25,13 +25,13 @@ class Sequel::Model
     # find will cache all finds in a scope
     def find id
       return nil if id.blank?
-      Lux.current.cache("#{self}/#{id}", ttl: cache_ttl) { where(id:id).first }
+      Lux.current.cache("#{self}/#{id}", ttl: cattr.cache_ttl) { where(id:id).first }
     end
 
     # find first and cache it
     def cached_first filter
       where_filter = xwhere filter
-      Lux.current.cache(where_filter.sql, ttl: cache_ttl) { where_filter.first }
+      Lux.current.cache(where_filter.sql, ttl: cattr.cache_ttl) { where_filter.first }
     end
   end
 end

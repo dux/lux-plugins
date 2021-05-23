@@ -1,5 +1,5 @@
 class LuxOauth
-  class_attribute :local_path, 'callback'
+  cattr.local_path = 'callback'
 
   class << self
     def get target
@@ -25,7 +25,7 @@ class LuxOauth
   end
 
   def redirect_url
-    [host, LuxOauth.local_path, @target].join('/')
+    [host, cattr.local_path, @target].join('/')
   end
 
   private

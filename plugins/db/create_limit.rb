@@ -10,13 +10,13 @@
 # create max 30 object that have the same :org_id
 # create_limit 30, :org_id
 
-ApplicationModel.class_attribute :create_limit_data
+ApplicationModel.cattr :create_limit_data
 
 module Sequel::Plugins::LuxCreateLimit
   module ClassMethods
 
-    def create_limit number, in_time, desc=nil
-      create_limit_data [number, in_time, desc]
+    def create_limit number, in_time, name=nil
+      cattr.create_limit_data = [number, in_time, name]
     end
   end
 
@@ -30,10 +30,13 @@ module Sequel::Plugins::LuxCreateLimit
       # return if Lux.env.cli?
       return unless defined?(User)
 
-      if data = self.class.create_limit_data
+      # return if object exists
+      return if self[:id]
+
+      if data = cattr.create_limit_data
         raise Lux::Error.unauthorized('You need to log in to save') unless ::User.try(:current)
 
-        max_count, sec_or_field = *data
+        max_count, sec_or_field, name = *data
 
         if sec_or_field.is_a?(Symbol)
           current_count = self.class.my.xwhere(sec_or_field => self[sec_or_field]).count
@@ -43,8 +46,9 @@ module Sequel::Plugins::LuxCreateLimit
         end
 
         if current_count >= max_count
-          name = self.class.to_s.tableize.humanize.downcase
-          errors.add(:base, "You are allowed to create max of #{count} #{name} in #{(seconds/60).to_i} minutes (Spam protection).")
+          time   = data[1].class == AS::Duration ? data[1].parts[0].to_a.reverse.join(' ') : "#{data[1].to_i/60} minutes"
+          name ||= (self.class.display_name.pluralize rescue self.class.to_s.tableize.humanize).downcase
+          errors.add(:base, "You are allowed to create max of #{max_count} #{name} in #{time} (Spam protection).")
         end
       end
     end

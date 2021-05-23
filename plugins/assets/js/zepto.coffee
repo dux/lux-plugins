@@ -71,12 +71,18 @@ $.parseScripts = (html) ->
   tmp.innerHTML = html
 
   for script_tag in tmp.getElementsByTagName('script')
-    next if script_tag.getAttribute('src') || !script_tag.innerText
+    continue if script_tag.getAttribute('src') || !script_tag.innerText
     type = script_tag.getAttribute('type') || 'javascript'
+
     if type.indexOf('javascript') > -1
-      f = new Function script_tag.innerText
-      f()
-      script_tag.innerText = '1;'
+      try
+        f = new Function script_tag.innerText
+        f()
+        script_tag.innerText = '1;'
+      catch e
+        console.error(e)
+        alert "JS error: #{e.message}"
+
 
   tmp.innerHTML
 
