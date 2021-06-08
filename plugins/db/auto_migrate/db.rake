@@ -50,12 +50,16 @@ namespace :db do
       Lux.run "psql #{db_name}_test < #{seed}"
     else
       Lux.info 'Seed "%s" not found' % seed
-      invoke  'db:am'
+      invoke 'db:am'
+      system 'rake db:am'
     end
   end
 
   desc 'Load seed from ./db/seeds '
-  task :seed do
+  task seed: :app do
+    all_tables = "SELECT table_name FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog', 'information_schema') and table_type='BASE TABLE' and table_name not in ('spatial_ref_sys')"
+    DB[all_tables].all.map{|el| DB['truncate %s' % el[:table_name]].all }
+
     for file in Dir['db/seeds/*'].sort
       puts 'Seed: %s' % file.green
       load file

@@ -32,7 +32,10 @@ window.Pjax = class Pjax
 
   # refresh page, keep scrool
   @refresh: (func) ->
-    Pjax.load(Pjax.path(), { no_scroll: true, done: func })
+    if typeof func == 'string'
+      Pjax.load(func, { no_scroll: true })
+    else
+      Pjax.load(Pjax.path(), { no_scroll: true, done: func })
 
   # reload, jump to top, no_cache http request forced
   @reload: (func) ->
@@ -50,10 +53,6 @@ window.Pjax = class Pjax
   @console: (msg) ->
     unless @is_silent
       console.log msg
-
-  # what to do on request error
-  @on_error: (ret) ->
-    @console("Pjax request error: #{ret.statusText} (#{ret.status})")
 
   # execute action before pjax load and do not proceed if return is false
   # example, load dialog links inside the dialog
@@ -174,7 +173,7 @@ window.Pjax = class Pjax
         # fix href because of redirects
         if rul = @req.responseURL
           @href = rul.split('/')
-          @href.splice(0,3)
+          @href.splice(0, 3)
           @href = '/' + @href.join('/')
 
         unless @opts.no_history
@@ -219,13 +218,13 @@ class ResponsePage
 
   @parseScripts: () ->
     for script_tag in Pjax.node().getElementsByTagName('script')
-      next if script_tag.getAttribute('src') || !script_tag.innerText
-      type = script_tag.getAttribute('type') || 'javascript'
+      unless script_tag.getAttribute('src')
+        type = script_tag.getAttribute('type') || 'javascript'
 
-      if type.indexOf('javascript') > -1
-        func = new Function script_tag.innerText
-        func()
-        script_tag.innerText = '1;'
+        if type.indexOf('javascript') > -1
+          func = new Function script_tag.innerText
+          func()
+          script_tag.innerText = '1;'
 
   #
 
