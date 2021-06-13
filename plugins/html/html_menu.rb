@@ -44,7 +44,7 @@ class HtmlMenu
       when Symbol
         @path.end_with?(test.to_s)
       when String
-        @path.end_with?(test)
+        @path.include?(test)
       when Regexp
         !!(@path =~ test)
       when Proc
@@ -63,7 +63,19 @@ class HtmlMenu
   # return result as a list
   def to_a
     # activate default element if one set and it is not acrivated
-    @data.map { |el| el[3] = true if el[2][:default] } unless @is_activated
+    unless @is_activated
+      @data.map do |el|
+        if el[2][:default]
+          @is_activated = true
+          el[3] = true
+        end
+      end
+    end
+
+    unless @is_activated
+      @data[0][3] = true
+    end
+
     @data
   end
 

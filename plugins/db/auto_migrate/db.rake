@@ -38,20 +38,19 @@ namespace :db do
   end
 
   desc 'Reset database from db/seed.sql'
-  task :reset do
-    invoke  'db:drop'
-    invoke  'db:create'
-
-    seed = Pathname.new './tmp/db_dump/seed.sql'
-
-    if seed.exist?
-      Lux.info 'Seed "%s" found' % seed
-      Lux.run "psql #{db_name} < #{seed}"
-      Lux.run "psql #{db_name}_test < #{seed}"
+  task :reset, [:fast] do |_, args|
+    if args.fast
+      DB.disconnect
+      run "dropdb #{db_name}"
+      run "createdb #{db_name} -T #{db_name}_test"
     else
-      Lux.info 'Seed "%s" not found' % seed
+      invoke 'db:drop'
+      invoke 'db:create'
       invoke 'db:am'
-      system 'rake db:am'
+
+      DB.disconnect
+      run 'rake db:am'
+      run "createdb #{db_name}_test -T #{db_name}"
     end
   end
 
@@ -69,7 +68,7 @@ namespace :db do
   desc 'Create database'
   task :create do
     Lux.run "createdb #{db_name}"
-    Lux.run "createdb #{db_name}_test"
+    # Lux.run "createdb #{db_name}_test"
   end
 
   desc 'Drop database'

@@ -25,8 +25,8 @@ class HtmlInput
 
     @name =
     if name.is_a?(Array)
-      @opts[:value] = (@object.send(name.first) || {})[name[1].to_s] if @object
-      @opts[:name]  = '%s[%s]' % name
+      @opts[:value] ||= (@object.send(name.first) || {})[name[1].to_s] if @object
+      @opts[:name]    = '%s[%s]' % name
     else
       @opts[:name] = name
     end

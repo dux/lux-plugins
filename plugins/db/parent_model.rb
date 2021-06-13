@@ -12,14 +12,22 @@ module Sequel::Plugins::ParentModel
     # apply parent attributes
     def parent= model
       if db_schema[:parent_key]
-        self[:parent_key] = '%s/%s' % [model.class, model.id]
+        if model.is_a?(String)
+          if model.include?('/')
+            self[:parent_key] = model
+          else
+            raise ArgumentErorr.new('Parent key is missing /')
+          end
+        else
+          self[:parent_key] = '%s/%s' % [model.class, model.id]
+        end
       else
         self[:parent_type] = model.class.to_s
         self[:parent_id] = model.id
       end
     end
 
-    # @board.parent                 -> @list
+    # @board.parent -> @list
     def parent
       if key = self[:parent_key]
         key = key.split('/')
@@ -33,7 +41,7 @@ module Sequel::Plugins::ParentModel
 
     # check if parent is present
     def parent?
-      db_schema[:parent_key] || db_schema[:parent_id]
+      db_schema[:parent_key] || (db_schema[:parent_id] && db_schema[:parent_id])
     end
   end
 

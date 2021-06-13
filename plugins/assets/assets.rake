@@ -6,11 +6,14 @@ namespace :assets do
   desc 'Generate Procfile data. You can run it with overmind or foreman'
   task :run do
     files = []
+    files.push '# generated via "rake assets:run"'
     files.push 'js: rollup -cw'
 
     for file in Dir.files('./app/assets').filter { |_| %w(css sass scss).include?(_.split('.').last) }
       files.push "#{file.gsub('.', '_')}: find app/assets -name *.*css | entr -r npx node-sass app/assets/#{file} -o public/assets/ --output-style expanded --source-comments"
     end
+
+    files.push 'web: bundle exec lux s'
 
     puts files.join($/)
   end

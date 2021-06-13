@@ -237,7 +237,7 @@ $.fn.reload = (path, func) ->
   else
     node_id = @[0].nodeName
 
-  $.cachedGet path, (data) =>
+  $.get path, (data) =>
     data = $.parseScripts data
     data = $("""<div>#{data}</div>""").find(node_id).html()
     this.html(data)

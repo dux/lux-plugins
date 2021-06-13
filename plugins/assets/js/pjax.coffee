@@ -1,20 +1,25 @@
-# make new class PjaxPage, work with that
-
-# How to use?
-
 # Pjax will replace only contents of MAIN HTML tag
 # HTML <main> Tag
 # https://www.w3schools.com/tags/tag_main.asp
 
+# How to use?
+
+# Pjax.error = (msg) -> Info.error msg
+# Pjax.captureOnClick()
 # Pjax.no_scroll('.no-scroll', '.menu-heading', '.skill', ()=>{ ... })
-# set meta[name=pjax_template_id] in header, and full reaload page on missmatch
-# Pjax.init -> ... -> function to execute after every page load
+# Pjax.before ->
+#   InlineDialog.save()
+# Pjax.after ->
+#   InlineDialog.restore() if window.InlineDialog
+#   Dialog.close() if window.Dialog
 
 window.Pjax = class Pjax
   @is_silent      = false
   @no_scroll_list = []
-  @before_test    = []
   @paths_to_skip  = []
+
+  @onDocumentClick: ->
+    document.addEventListener 'click', PjaxOnClick.main
 
   # base class method to load page
   @load: (href, opts) ->
@@ -54,16 +59,44 @@ window.Pjax = class Pjax
     unless @is_silent
       console.log msg
 
+  # Pjax.init ->
+  #  Widget.bind()
+  #  Dialog.close()
+  #  ga('send', 'pageview') if window.ga;
+  # init Pjax with function that will run after every pjax request
+  @init: (func) -> @after func
+  @after: (func) ->
+    if func
+      @after_func = func
+      func()
+    else
+      @after_func() if @after_func
+
+  # replace with real page reload init func
+  @before: (func) ->
+    if func
+      @before_func = func
+    else if @before_func
+      return @before_func()
+
+    true
+
   # execute action before pjax load and do not proceed if return is false
   # example, load dialog links inside the dialog
-  # Pjax.before (href, opts) ->
+  # Pjax.test (href, opts) ->
   #   if opts.node
   #     if opts.node.closest('.in-popup')
   #       Dialog.load href
   #       return false
   #   true
-  @before: (func) ->
-    @before_test.push func
+  @test: (arg1, arg2) ->
+    if arg2
+      if @test_func
+        @test_func(arg1, arg2)
+      else
+        true
+    else
+      @test_func = arg1 if typeof arg1 == 'function'
 
   # do not scroll to top, use refresh() and not reload() on node with classes
   # Pjax.no_scroll('.no-scroll', '.menu-heading', '.skill')
@@ -84,23 +117,6 @@ window.Pjax = class Pjax
     for el in arguments
       @paths_to_skip.push el
 
-  # Pjax.init ->
-  #  Widget.bind()
-  #  Dialog.close()
-  #  ga('send', 'pageview') if window.ga;
-  # init Pjax with function that will run after every pjax request
-  @init: (func) ->
-    @init_ok = true
-
-    # if page change fuction provided, store it and run it
-    if func
-      document.addEventListener 'DOMContentLoaded', ->
-        Pjax.after = func
-        func()
-
-  # replace with real page reload init func
-  @after: -> true
-
   ###########
 
   constructor: (@href, @opts) ->
@@ -118,14 +134,11 @@ window.Pjax = class Pjax
 
   # load a new page
   load: ->
-    @info 'You did not use Pjax.init()' unless Pjax.init_ok
-
     return false unless @href
 
     @href = location.pathname + @href if @href[0] == '?'
 
-    for func in Pjax.before_test
-      return false unless func(@href, @opts)
+    return if Pjax.test(@href, @opts) == false
 
     if @href == '#' || (location.hash && location.pathname == @href)
       return
@@ -210,8 +223,10 @@ class ResponsePage
   @set: (title, main_data) ->
     if main_node = Pjax.node()
       document.title      = title || 'no page title (pjax)'
+      Pjax.before()
       main_node.innerHTML = main_data
       @parseScripts()
+      Pjax.after()
 
     else
       Pjax.info 'No pjax node?'
@@ -256,7 +271,6 @@ class ResponsePage
     if node.id
       if node.id == Pjax.node().id
         ResponsePage.set @extract('title').HTML, node.innerHTML
-        Pjax.after()
         return true
       else
         Pjax.info 'template_id mismatch, full page load'
@@ -278,10 +292,43 @@ class PjaxHistory
   @loadFromHistory: (event) ->
     if event.state.main
       ResponsePage.set event.state.title, event.state.main
-      Pjax.after()
     else
       Pjax.load Pjax.path(), no_history: true
 
 # handle back button gracefully
 window.onpopstate = PjaxHistory.loadFromHistory
 
+PjaxOnClick =
+  run: (func) ->
+    event.stopPropagation()
+    event.preventDefault()
+    func()
+
+  main: ->
+    # if ctrl or cmd button is pressed
+    return if event.which == 2
+
+    # self or scoped href, as on %tr row element.
+    if node = event.target.closest('*[href]')
+      # scoped confirmatoon box
+      if confirm_node = node.closest('*[confirm]')
+        return unless confirm(confirm_node.getAttribute('confirm'))
+
+      # nested onclick events
+      if click_node = node.closest('*[click]') || node.closest('*[onclick]')
+        data = click_node.getAttribute('click') || click_node.getAttribute('onclick')
+        func = new Function(data)
+
+        if func.bind(click_node)() == false
+          PjaxOnClick.run -> false
+          return false
+
+      if href = node.getAttribute 'href'
+        klass = ' ' + node.className + ' '
+        return if /^\w/.test(href)
+        return if node.getAttribute('target')
+        return if klass.includes(' no-pjax ')
+        return if klass.includes(' direct ')
+        return if event.metaKey
+
+        PjaxOnClick.run -> Pjax.load href, node: node

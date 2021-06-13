@@ -56,7 +56,9 @@ class HtmlInput
     end
 
     @opts[:class] ||= 'form-control'
-    @opts[:step]  ||= 1
+
+    # use 1 not to show seconds
+    @opts[:step]  ||= 60
 
     @opts[:type] = 'datetime-local'
     @opts.tag(:input)
