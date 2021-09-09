@@ -72,10 +72,6 @@ class HtmlMenu
       end
     end
 
-    unless @is_activated
-      @data[0][3] = true
-    end
-
     @data
   end
 

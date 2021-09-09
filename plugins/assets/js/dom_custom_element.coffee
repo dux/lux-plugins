@@ -15,9 +15,10 @@ window._ceh_cache ||= {}
 window.Svelte = (name, func) ->
   if func
     if typeof func == 'object'
-      target = func.closest("s-#{name}")
-      target = target[0] if target[0]
-      target.svelte
+      if target = func.closest("s-#{name}")
+        target.svelte
+      else
+        null
     else
       Array.prototype.slice
         .call document.getElementsByTagName("s-#{name}")
@@ -35,32 +36,29 @@ window.Svelte = (name, func) ->
     alert('Svelte error: not supported')
 
 # bind Svelte elements
-Object.assign Svelte,
-  cnt: 0
-
   # bind custom node to class
-  bind:(name, svelte_klass) ->
-    CustomElement.define name, (node, opts) ->
-      return if node.is_binded
-      node.is_binded = true
+Svelte.bind = (name, svelte_klass, klass_opts = {}) ->
+  CustomElement.define name: name, inline: klass_opts.inline, func: (node, opts) ->
+    return if node.is_binded
+    node.is_binded = true
 
-      in_opts = {
-        props: {
-          ...opts,
-          node: node,
-          html: if /\w+/.test(String(node.innerHTML)) then node.innerHTML else ''
-        }
+    in_opts = {
+      props: {
+        ...opts,
+        node: node,
+        html: if /\w+/.test(String(node.innerHTML)) then node.innerHTML else ''
       }
+    }
 
-      node.innerHTML = ''
+    node.innerHTML = ''
 
-      svelte_node = new svelte_klass({ target: node, props: in_opts })
-      node.svelte = svelte_node
+    svelte_node = new svelte_klass({ target: node, props: in_opts })
+    node.svelte = svelte_node
 
-      # export const component = { global: 'Dialog' }
-      if c = svelte_node.component
-        if c.global
-          window[c.global] = svelte_node
+    # export const component = { global: 'Dialog' }
+    if c = svelte_node.component
+      if c.global
+        window[c.global] = svelte_node
 
 # create DOM custom element or polyfil for older browsers
 window.CustomElement =
@@ -68,18 +66,19 @@ window.CustomElement =
   un_registred: {}
 
   attributes: (node) ->
-    Array.prototype.slice
-      .call(node.attributes)
-      .reduce (h, el) ->
-        h[el.name] = el.value;
-        # if window.dev != true
-        #   unless ['id', 'class'].includes(el.name) || el.name.includes('data-') || el.name.startsWith('on')
-        #     node.removeAttribute el.name
-        h
-      , {}
+    if props = node.getAttribute('data-props')
+      # if you want to send nested complex data, best to define as data-props encoded as JSON
+      JSON.parse(props)
+    else
+      Array.prototype.slice
+        .call(node.attributes)
+        .reduce (h, el) ->
+          h[el.name] = el.value;
+          h
+        , {}
 
   # define custom element
-  define: (name, func) ->
+  define: ({name, inline, func}) ->
     @registred[name] = func
 
     if window.customElements
@@ -88,8 +87,12 @@ window.CustomElement =
           attributeChangedCallback: (name, oldValue, newValue) ->
             console.log('attributeChangedCallback', name, oldValue, newValue)
           connectedCallback: ->
-            window.requestAnimationFrame =>
+            if inline
+              # inline tags are tags with no innerHTML, we initialize faster without animation frame if able
               func @, CustomElement.attributes(@)
+            else
+              window.requestAnimationFrame =>
+                func @, CustomElement.attributes(@)
     else
       @un_registred[name] = func
 
@@ -101,7 +104,7 @@ unless window.customElements
       for node in Array.from(document.querySelectorAll("#{name}:not(.mounted)"))
         node.classList.add('mounted')
         func node, CustomElement.attributes(node)
-  , 300
+  , 500
 
 # # bind react elements
 # bind_react: (name, klass) ->

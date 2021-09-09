@@ -31,10 +31,17 @@ ApplicationHelper.class_eval do
   end
 
   # public asset from manifest
+  #   = asset 'domain.css'
+  # remote url
+  #   = asset 'https://cdnjs.cloudflare.com/ajax/libs/marked/2.1.3/marked.min.js'
+  # force css link type
+  #   = asset 'https://cdn.com/fooliib', as: :css
+  # dynamicly generated from controller
+  #   = asset '/assets.js', dynamic: true
   def asset name, opts={}
-    return asset_tag(name, opts) if name.include?('//')
-
-    if name[0,1] == '/'
+    if name.include?('//') || opts.delete(:dynamic)
+      asset_tag(name, opts)
+    elsif name[0,1] == '/'
       name += '?%s' % Digest::SHA1.hexdigest(File.read('./public%s' % name))[0,12]
     else
       name =
@@ -56,16 +63,16 @@ ApplicationHelper.class_eval do
   def asset_tag name, opts={}
     opts[:crossorigin] = 'anonymous' if name.include?('http')
 
-    if name.include?('.js')
+    if opts[:as] == :js || name.include?('.js')
       opts[:src] = name
       opts.tag :script
-    elsif name.include?('.css')
-      opts[:media] = 'all'
-      opts[:rel]   = 'stylesheet'
-      opts[:href]  = name
+    elsif opts[:as] == :css || name.include?('css')
+      opts[:href]    = name
+      opts[:media] ||= 'all'
+      opts[:rel]   ||= 'stylesheet'
       opts.tag :link
     else
-      raise 'Not supported asset extensio'
+      raise 'Not supported asset extension'
     end
   end
 

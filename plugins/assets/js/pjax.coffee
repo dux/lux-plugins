@@ -4,9 +4,9 @@
 
 # How to use?
 
-# Pjax.error = (msg) -> Info.error msg
 # Pjax.captureOnClick()
-# Pjax.no_scroll('.no-scroll', '.menu-heading', '.skill', ()=>{ ... })
+# Pjax.error = (msg) -> Info.error msg
+# Pjax.noScrollOn('.no-scroll', '.menu-heading', '.skill', ()=>{ ... })
 # Pjax.before ->
 #   InlineDialog.save()
 # Pjax.after ->
@@ -15,7 +15,7 @@
 
 window.Pjax = class Pjax
   @is_silent      = false
-  @no_scroll_list = []
+  @no_scroll_list = ['.no-scroll']
   @paths_to_skip  = []
 
   @onDocumentClick: ->
@@ -47,7 +47,7 @@ window.Pjax = class Pjax
     Pjax.load(Pjax.path(), { no_cache: true, done: func })
 
   @node: ->
-    document.getElementsByTagName('pjax')[0] || document.getElementsByClassName('pjax')[0]
+    document.getElementsByTagName('pjax')[0] || document.getElementsByClassName('pjax')[0] || alert('.pjax or #pjax not found')
 
   # send info to a client
   @info: (data) ->
@@ -77,9 +77,9 @@ window.Pjax = class Pjax
     if func
       @before_func = func
     else if @before_func
-      return @before_func()
-
-    true
+      @before_func()
+    else
+      true
 
   # execute action before pjax load and do not proceed if return is false
   # example, load dialog links inside the dialog
@@ -99,9 +99,14 @@ window.Pjax = class Pjax
       @test_func = arg1 if typeof arg1 == 'function'
 
   # do not scroll to top, use refresh() and not reload() on node with classes
-  # Pjax.no_scroll('.no-scroll', '.menu-heading', '.skill')
-  @no_scroll: ->
+  # Pjax.noScrollOn('.no-scroll', '.menu-heading', '.skill')
+  @noScrollOn: ->
     @no_scroll_list = arguments
+
+  # overload to add filters
+  # Pjax.beforeLoad(@href, @opts.node)
+  @beforeLoad: ->
+    true
 
   @no_scroll_check: (node) ->
     return unless node && node.closest
@@ -116,6 +121,9 @@ window.Pjax = class Pjax
   @skip: ->
     for el in arguments
       @paths_to_skip.push el
+
+  @error: (msg) ->
+    console.error "Pjax error: #{msg}"
 
   ###########
 
@@ -151,6 +159,8 @@ window.Pjax = class Pjax
         when 'object' then return @redirect() if el.test(@href)
         when 'function' then return @redirect() if el(@href)
         else return @redirect() if @href.startsWith(el)
+
+    return if Pjax.beforeLoad(@href, @opts.node) == false
 
     @opts.req_start_time = (new Date()).getTime()
 
@@ -302,11 +312,12 @@ PjaxOnClick =
   run: (func) ->
     event.stopPropagation()
     event.preventDefault()
-    func()
+    func() if func
+    false
 
   main: ->
     # if ctrl or cmd button is pressed
-    return if event.which == 2
+    return if event.which == 2 || event.metaKey
 
     # self or scoped href, as on %tr row element.
     if node = event.target.closest('*[href]')
@@ -320,15 +331,18 @@ PjaxOnClick =
         func = new Function(data)
 
         if func.bind(click_node)() == false
-          PjaxOnClick.run -> false
-          return false
+          return PjaxOnClick.run()
 
       if href = node.getAttribute 'href'
+        if /^javascript:/.test(href)
+          return
+
+        if /^\w/.test(href) || node.getAttribute('target')
+          return PjaxOnClick.run ->
+            window.open(href, node.getAttribute('target') || href.replace(/[^\w]/g, ''))
+
         klass = ' ' + node.className + ' '
-        return if /^\w/.test(href)
-        return if node.getAttribute('target')
         return if klass.includes(' no-pjax ')
         return if klass.includes(' direct ')
-        return if event.metaKey
 
         PjaxOnClick.run -> Pjax.load href, node: node

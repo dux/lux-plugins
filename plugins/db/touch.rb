@@ -1,5 +1,6 @@
 module Sequel::Plugins::LuxTouch
   module InstanceMethods
+    # used to touch changed columns, to clear both caches
     # touch_on :org_id
     def touch_on name, klass=nil
       klass ||= name.to_s.sub(/_ids?$/, '').classify.constantize

@@ -53,7 +53,7 @@ class Lux::Api
       end
 
       for k in params.keys
-        params[k] = params[k].gsub('<','&lt;').gsub('>','&gt;').gsub(/\A^\s+|\s+\z/,'') if params[k].kind_of?(String)
+        params[k] = params[k].html_escape if params[k].kind_of?(String)
       end
 
       begin

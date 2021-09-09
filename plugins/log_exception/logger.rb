@@ -12,28 +12,27 @@ module Lux
 
         history = exception.backtrace || []
         history = history
-          .map{ |el| el.sub(Lux.root.to_s, '') }
+          .map{ |el| el.sub(Lux.root.to_s, '.') }
           .join("\n")
 
-        key  = Digest::SHA1.hexdigest history
+        key    = Digest::SHA1.hexdigest history
+        data   = '%s in %s (user: %s, time: %s)' % [exception.class, Lux.current.request.url, (Lux.current.var.user.email rescue 'guest'), Time.now.long]
+        data   = [data, 'REFER: %s' % Lux.current.request.env['HTTP_REFERER'].or(':unknown'), exception.message, history].join("\n\n")
+        folder = Lux.root.join('log/exceptions/%s' % exception.class).to_s
 
-        data = '%s in %s (user: %s, time: %s)' % [exception.class, Lux.current.request.url, (Lux.current.var.user.email rescue 'guest'), Time.now.long]
-        data = [data, 'REFER: %s' % Lux.current.request.env['HTTP_REFERER'].or(':unknown'), exception.message, history].join("\n\n")
-
-        folder = Lux.root.join('log/exceptions').to_s
-        Dir.mkdir(folder) unless Dir.exists?(folder)
-
+        FileUtils.mkdir_p(folder)
         File.write("#{folder}/#{key}.txt", data)
 
-        Lux.logger(:exceptions).error [key, User.current.try(:email).or('guest'), exception.message].join(' - ')
+        Lux.logger(:exceptions).error [exception.class.to_s, key, User.current.try(:email).or('guest'), exception.message].join(' - ')
 
         key
       end
 
-      def list
-        error_files = Dir['%s/*.txt' % ERROR_FOLDER].sort_by { |x| File.mtime(x) }.reverse
+      def list folder, limit = 20
+        from = '%s/%s/*.txt' % [ERROR_FOLDER, folder]
+        error_files = Dir[from].sort_by { |x| File.mtime(x) }.reverse
 
-        error_files[0, 100].map do |file|
+        error_files[0, limit].map do |file|
           last_update = (Time.now - File.mtime(file)).to_i
 
           age = if last_update < 60
@@ -56,8 +55,10 @@ module Lux
         end
       end
 
-      def get code
-        for el in list
+      def get location
+        folder, code = location.split('/')
+
+        for el in list(folder)
           return el if el[:code] == code
         end
       end

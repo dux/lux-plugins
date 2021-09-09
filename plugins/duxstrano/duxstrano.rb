@@ -39,13 +39,32 @@ if $0.ends_with?('/rake') || ENV['DUXSTRANO'] == 'true'
 
     ###
 
-    attr_reader :host
-
     def initialize opts, &block
       server = opts[:server].to_s == '' ? HOSTS.keys.first : opts[:server].to_sym
-      @host = HOSTS[server]
+      set_host server
       @args = opts
       instance_exec opts, &block
+    end
+
+    def set_host name
+      @host = HOSTS[name] || die("Server [%s] not defined" % name)
+    end
+
+    # host :db -> set host to :db
+    # host(:db) { ... } -> execute in context
+    # host -> @host
+    def host name = nil
+      if name
+        old_host = @host
+        set_host name
+
+        if block_given?
+          yield
+          @host = old_host
+        end
+      else
+        @host
+      end
     end
 
     # return true or execute block if we are on a right host
@@ -120,7 +139,7 @@ if $0.ends_with?('/rake') || ENV['DUXSTRANO'] == 'true'
       destination ||= source
       source        = source.sub(/^\.\//, '%s/' % @host.path)
 
-      local "scp #{source} #{@host.user}@#{@host.ip}:#{destination}"
+      local "scp #{@host.user}@#{@host.ip}:#{source} #{destination}"
     end
   end
 

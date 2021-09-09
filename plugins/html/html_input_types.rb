@@ -205,7 +205,7 @@ class HtmlInput
 
   def as_html
     # consider http://prosemirror.net
-    %[<s-pell name="#{@opts[:name]}">#{@opts[:value].to_s.to_html}</s-pell>]
+    %[<s-pell name="#{@opts[:name]}">#{@opts[:value].to_s.html_safe}</s-pell>]
   end
 
   def as_address

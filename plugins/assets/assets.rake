@@ -70,4 +70,9 @@ namespace :assets do
     puts
     Lux.run 'cat %s' % src.join('Procfile')
   end
+
+  desc 'Development server '
+  task :server do
+
+  end
 end
