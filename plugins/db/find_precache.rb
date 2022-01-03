@@ -6,22 +6,13 @@
 #   .precache(:job_id)
 #   .precache(:org_id)
 
-ApplicationModel.class_eval do
-  cattr :cache_ttl, nil
-end
-
-#
-
 class Sequel::Model
-  module InstanceMethods
-    def cache_id full=false
-      keys = [self.class, id]
-      keys.push self[:updated_at].to_f if full
-      keys.join('/')
-    end
-  end
-
   module ClassMethods
+    def include _
+      self.cattr :cache_ttl, nil
+      super
+    end
+
     # find will cache all finds in a scope
     def find id
       return nil if id.blank?
@@ -32,6 +23,14 @@ class Sequel::Model
     def cached_first filter
       where_filter = xwhere filter
       Lux.current.cache(where_filter.sql, ttl: cattr.cache_ttl) { self.where_filter.first }
+    end
+  end
+
+  module InstanceMethods
+    def cache_id full=false
+      keys = [self.class, id]
+      keys.push self[:updated_at].to_f if full
+      keys.join('/')
     end
   end
 end

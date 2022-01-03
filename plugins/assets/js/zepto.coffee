@@ -54,15 +54,19 @@ $.cachedGet = (url, func) ->
         $._cached_get[url] = data
 
 # insert script in the head
-$.getScript = (src, func) ->
-  # if $("script[src='#{src}']").length > 0
-  #   func()
-  # else
-  script = document.createElement('script')
-  script.async  = 'async'
-  script.src    = src
-  script.onload = func if func
-  document.getElementsByTagName('head')[0].appendChild script
+$.getScript = (src, check, func) ->
+  unless func
+    func = check
+    check = null
+
+  if check && check()
+     func()
+  else
+    script = document.createElement('script')
+    script.async  = 'async'
+    script.src    = src
+    script.onload = func if func
+    document.getElementsByTagName('head')[0].appendChild script
 
 # parse and execute nested <script> tags
 # we need this for example in svelte, where template {@html data} does nor parse scripts
@@ -157,6 +161,19 @@ $.noCacheGet = (path, func) ->
     headers: { 'cache-control': 'no-cache' }
     success: func
 
+# run fuction only once
+$.once_hash = {}
+$.once = (name, func) ->
+  if $.once_hash[name]
+    false
+  else
+    $.once_hash[name] = true
+    func()
+    true
+
+$.resizeIframe = (obj) ->
+  obj.style.height = obj.contentWindow.document.documentElement.scrollHeight + 'px';
+
 # add html but do not everwrite ids
 $.fn.xhtml = (data) ->
   id = $(@).attr('id')
@@ -175,6 +192,7 @@ $.fn.xhtml = (data) ->
 
     this.innerHTML = data
 
+# get or set unique ID on a node
 $.fn.node_id = ->
   unless window._node_id_cnt
     window._node_id_cnt = 0
@@ -228,21 +246,44 @@ $.fn.xfocus = ->
 
 # load URL and replace content under specific ID
 # executes scripts found in a page
-# $('#card-dialog-main').reload('/c/cts/show_dialog')
+# load path into node
+#   $('#dialog').reload('/c/cts/show_dialog')
+# load path from attribute
+#   #dialog{ path: '...' }
+#   $('#dialog').reload() -> path in attribute
+# refresh full page and replace only target element
+#   $('#dialog').reload() -> path in attribute
 $.fn.reload = (path, func) ->
-  node_id = @attr('id')
+  if typeof path == 'function'
+    func = path
+    path = null
 
-  if node_id
-    node_id = "##{node_id}"
-  else
-    node_id = @[0].nodeName
+  ajax_node = @parents('.ajax').first()
+  ajax_node = @ unless ajax_node[0]
+
+  path  ||= ajax_node.attr('path')
+
+  unless path
+    alert 'Ajax path not found'
+    return
+
+  node_id = ajax_node.attr('id')
+  ajax_node.attr('path', path)
 
   $.get path, (data) =>
+    new_node = $("""<div>#{data}</div>""")
+    if node_id
+      if html = new_node.find('#'+node_id).html()
+        data = html
+    else
+      if html = new_node.find('.ajax').html()
+        data = html
+
     data = $.parseScripts data
-    data = $("""<div>#{data}</div>""").find(node_id).html()
-    this.html(data)
+    ajax_node.html(data)
     func(data) if func
 
+# stop event propaation from a node
 $.fn.cancel = ->
   e = @[0]
   if e.preventDefault
@@ -250,3 +291,14 @@ $.fn.cancel = ->
     e.stopPropagation()
   else if window.event
     window.event.cancelBubble = true
+
+# searches for parent %ajax node and refreshes with given url
+$.fn.ajax = (path) ->
+  node = if @hasClass('ajax') then @ else @parents('.ajax')
+
+  if path
+    node.attr 'path', path
+  else
+    path = node.attr 'path'
+
+  node.load path

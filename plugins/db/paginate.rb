@@ -51,7 +51,8 @@ Sequel::Model.db.extension :pagination
 
 Sequel::Model.dataset_module do
   def page size: 20, param: :page, page: nil, count: nil
-    page = (page || Lux.current.params[param]).to_i
+    page = Lux.current.params[param] if Lux.current.params[param].respond_to?(:to_i)
+    page = page.to_i
     page = 1 if page < 1
 
     # ret = paginate(page, size).all

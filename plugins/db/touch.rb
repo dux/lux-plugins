@@ -14,8 +14,10 @@ module Sequel::Plugins::LuxTouch
     end
 
     def touch
-      Lux.current.once 'lux-touch-%s-%s' % [self.class, id] do
-        this.update updated_at: 'now()'
+      if db_schema[:updated_at]
+        Lux.current.once 'lux-touch-%s-%s' % [self.class, id] do
+          this.update updated_at: 'now()'
+        end
       end
    end
 

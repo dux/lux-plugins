@@ -14,15 +14,17 @@
 #   end
 # end
 
-# AutoMigrate.migrate do
-#   table :users do |t|
-#     t.string   'name', null: false
+# AutoMigrate.migrate DB_LOG do
+#   table :custom_links_logs do |t|
+#     t.string   'name', null: true
 #     t.string   'email'
 #   end
+#   typero :custom_link_log
 # end
 
 class AutoMigrate
   attr_accessor :fields
+  @@db = nil
 
   class << self
     def table table_name, opts={}
@@ -32,9 +34,9 @@ class AutoMigrate
 
       die 'Table name "%s" is not permited' % table_name if [:categories].include?(table_name)
 
-      unless DB.table_exists?(table_name.to_s)
+      unless self.db.table_exists?(table_name.to_s)
         # http://sequel.jeremyevans.net/rdoc/files/doc/schema_modification_rdoc.html
-        DB.create_table table_name do
+        self.db.create_table table_name do
           primary_key :id, Integer
           index :id, unique: true
         end
@@ -48,17 +50,22 @@ class AutoMigrate
       end
     end
 
-    def migrate &block
+    def migrate db_conn = nil, &block
+      @@db = db_conn || DB
       instance_eval &block
     end
 
+    def db
+      @@db || DB
+    end
+
     def enable_extension name
-      DB.run 'CREATE EXTENSION IF NOT EXISTS %s;' % name
+      self.db.run 'CREATE EXTENSION IF NOT EXISTS %s;' % name
     end
 
     def transaction_do text
       begin
-        DB.run 'BEGIN; %s ;COMMIT;' % text
+        self.db.run 'BEGIN; %s ;COMMIT;' % text
       rescue
         puts caller[1].red
         puts text.yellow
@@ -67,12 +74,14 @@ class AutoMigrate
     end
 
     def typero klass
-      name   = klass.tableize
-      schema = Typero.schema(klass) || raise('Schema "%s" not found' % name)
+      name   = klass.to_s.tableize
+      schema, opts = Typero.schema(klass, :with_opts) || raise('Schema "%s" not found' % name)
 
-      table name do |f|
-        for args in schema.db_schema
-          f.send *args
+      migrate opts[:db] || DB do
+        table name do |f|
+          for args in schema.db_schema
+            f.send *args
+          end
         end
       end
     end
@@ -100,8 +109,7 @@ class AutoMigrate
 
     Object.send(:remove_const, klass) if Object.const_defined?(klass)
 
-    eval %[class ::%s < Sequel::Model; end;] % klass
-    @object = klass.constantize.new
+    @object = self.class.db.schema(@table_name).to_h
   end
 
   def transaction_do text
@@ -144,14 +152,14 @@ class AutoMigrate
   end
 
   def update
-    puts "Table #{@table_name.to_s.yellow}, #{@fields.keys.length} fields"
+    puts "Table #{@table_name.to_s.yellow}, #{@fields.keys.length} fields in #{@@db.uri.split('/').last}"
 
     # remove extra fields
     if @opts[:drop].class != FalseClass
-      for field in (@object.columns - @fields.keys - [:id])
+      for field in (@object.keys - @fields.keys - [:id])
         print "Remove colum #{@table_name}.#{field} (y/N): ".light_blue
-        if STDIN.gets.chomp.downcase.index('y')
-          DB.drop_column @table_name, field
+        if Lux.env.production? || STDIN.gets.chomp.downcase.index('y')
+          self.class.db.drop_column @table_name, field
           puts " drop_column #{field}".green
         end
       end
@@ -165,11 +173,11 @@ class AutoMigrate
       db_type = get_db_column_type(field)
 
       # create missing columns
-      unless @object.columns.index(field.to_sym)
+      unless @object[field.to_sym]
         if db_type == :jsonb
           transaction_do "ALTER TABLE #{@table_name} ADD COLUMN #{field} jsonb DEFAULT '{}';"
         else
-          DB.add_column @table_name, field, db_type, opts
+          self.class.db.add_column @table_name, field, db_type, opts
 
           if opts[:array]
             default = type == :string ? "ARRAY[]::character varying[]" : "ARRAY[]::#{db_type}[]"
@@ -180,7 +188,7 @@ class AutoMigrate
         puts " add_column #{field}, #{db_type}, #{opts.to_json}".green
       end
 
-      if current = @object.db_schema[field]
+      if current = @object[field]
         # unhandled db schema changes will not happen
         # ---
         # field   - field name
@@ -275,7 +283,7 @@ class AutoMigrate
 
     begin
       if type.index('[]')
-        DB.run %[CREATE INDEX #{@table_name}_#{field}_gin_index on "#{@table_name}" USING GIN ("#{field}");]
+        self.class.db.run %[CREATE INDEX #{@table_name}_#{field}_gin_index on "#{@table_name}" USING GIN ("#{field}");]
         puts " * added array GIN index on #{field}".green
       else
         DB.add_index(@table_name, field)
@@ -288,7 +296,7 @@ class AutoMigrate
     existing_fields = @table_name.to_s.classify.constantize.new.columns
 
     if existing_fields.index(field_old.to_sym) && ! existing_fields.index(field_new.to_sym)
-      DB.rename_column(@table_name, field_old, field_new)
+      self.class.db.rename_column(@table_name, field_old, field_new)
       puts " * renamed #{@table_name}.#{field_old} to #{@table_name}.#{field_new}"
       puts ' * please run auto migration again'
       exit

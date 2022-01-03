@@ -51,7 +51,6 @@ Svelte.bind = (name, svelte_klass, klass_opts = {}) ->
     }
 
     node.innerHTML = ''
-
     svelte_node = new svelte_klass({ target: node, props: in_opts })
     node.svelte = svelte_node
 

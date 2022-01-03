@@ -10,10 +10,12 @@
 # create max 30 object that have the same :org_id
 # create_limit 30, :org_id
 
-ApplicationModel.cattr :create_limit_data
-
 module Sequel::Plugins::LuxCreateLimit
   module ClassMethods
+    def include _
+      self.cattr :create_limit_data
+      super
+    end
 
     def create_limit number, in_time, name=nil
       cattr.create_limit_data = [number, in_time, name]

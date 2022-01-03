@@ -5,7 +5,16 @@ class HtmlInput
   def as_string
     @opts[:type] = 'text'
     @opts[:autocomplete] ||= 'off'
-    @opts.tag(:input)
+    prefix = @opts.delete(:prefix)
+    out = @opts.tag(:input)
+    if prefix
+      %[<table style="width: 100%;"><tr>
+          <td style="background: #eee; color: #888; border: 1px solid #ddd; border-right: none; padding: 8px 10px 0 10px; width: 20px;">#{prefix}</td>
+          <td>#{out}</td>
+        </tr></table>]
+    else
+      out
+    end
   end
   alias :as_text :as_string
 

@@ -6,13 +6,10 @@ def db_backup_file_location args
 end
 
 def run_all_in_folder in_dir
-  in_dir.tap do |dir|
-    if Dir.exist?(dir)
-      Dir.require_all dir
-    else
-      Lux.info 'Dir %s not defined.' % dir
-    end
-  end
+  return unless Dir.files(in_dir).first
+
+  puts "* executing #{in_dir} scripts"
+  system "%s/bin/lux e '%s'" % [Lux.fw_root, %{Dir.require_all("./#{in_dir}").map{|el| "* %s" % el }.join($/)}]
 end
 
 db_name = Lux.config.db_url.split('/').last
@@ -92,6 +89,8 @@ namespace :db do
       end
     end
 
+    run_all_in_folder 'db/before'
+
     Lux.config.migrate = true
 
     load '%s/auto_migrate/auto_migrate.rb' % Lux.plugin(:db).folder
@@ -106,14 +105,12 @@ namespace :db do
 
     require './db/schema'
 
-    run_all_in_folder './db/before'
-
     klasses = Typero.schema(type: :model) || raise(StandardError.new('Typero schemas not loaded'))
 
     for klass in klasses
       AutoMigrate.typero klass
     end
 
-    run_all_in_folder './db/after'
+    run_all_in_folder 'db/after'
   end
 end

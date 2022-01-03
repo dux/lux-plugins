@@ -12,6 +12,14 @@
 # Pjax.after ->
 #   InlineDialog.restore() if window.InlineDialog
 #   Dialog.close() if window.Dialog
+# Pjax.load('/users/new', no_history: bool, no_scroll: bool, done: ()=>{...})
+
+# to refresh link in container only nameing of dom nodes is imporant
+# functionality rest is automatic, it will refres first .ajax parent by id
+# .ajax{ id: :foo }
+#   ...
+#   .ajax
+#     %a{ href: '' }
 
 window.Pjax = class Pjax
   @is_silent      = false
@@ -22,6 +30,9 @@ window.Pjax = class Pjax
     document.addEventListener 'click', PjaxOnClick.main
 
   # base class method to load page
+  # no_history: bool
+  # no_scroll: bool
+  # done: ()=>{...}
   @load: (href, opts) ->
     if Pjax.noCache
       Pjax.noCache  = false
@@ -35,7 +46,7 @@ window.Pjax = class Pjax
   @path: ->
     location.pathname+location.search
 
-  # refresh page, keep scrool
+  # refresh page, keep scroll
   @refresh: (func) ->
     if typeof func == 'string'
       Pjax.load(func, { no_scroll: true })
@@ -163,6 +174,9 @@ window.Pjax = class Pjax
     return if Pjax.beforeLoad(@href, @opts.node) == false
 
     @opts.req_start_time = (new Date()).getTime()
+    @opts.path = @href
+    @opts.no_scroll = true if @opts.node && @opts.node.closest('.ajax')
+    @opts.no_scroll = true if delete @opts.scroll == false
 
     headers = {}
     headers['cache-control'] = 'no-cache' if @opts.no_cache
@@ -203,7 +217,7 @@ window.Pjax = class Pjax
           PjaxHistory.replaceState()
 
         # inject response in current page and process if ok
-        if ResponsePage.inject(@response)
+        if ResponsePage.inject(@response, @opts)
           # add history
           unless @opts.no_history
             PjaxHistory.addCurrent(@href)
@@ -226,8 +240,8 @@ window.Pjax = class Pjax
 #
 
 class ResponsePage
-  @inject: (response) ->
-    response_page = new ResponsePage response
+  @inject: (response, opts) ->
+    response_page = new ResponsePage response, opts
     response_page.inject_in_current()
 
   @set: (title, main_data) ->
@@ -253,7 +267,7 @@ class ResponsePage
 
   #
 
-  constructor: (@response) ->
+  constructor: (@response, @opts) ->
     @page = document.createElement('div')
     @page.innerHTML = @response
 
@@ -274,6 +288,20 @@ class ResponsePage
 
   # replace title and main block
   inject_in_current: ->
+    if @opts.node
+      if ajax_node = @opts.node.closest('.ajax[path]')
+        @opts.no_history = true
+
+        ajax_node.setAttribute('path', @opts.path)
+
+        ajax_node.innerHTML =
+        if response_ajax_node = @page.getElementsByTagName('ajax')[0]
+           response_ajax_node.innerHTML
+        else
+          @response
+
+        return true
+
     unless node = @node()
       Pjax.info('No <pjax id="foo"> or <div class="pjax" id="foo"> node in response page')
       return false
@@ -283,7 +311,7 @@ class ResponsePage
         ResponsePage.set @extract('title').HTML, node.innerHTML
         return true
       else
-        Pjax.info 'template_id mismatch, full page load'
+        Pjax.error 'template_id mismatch, full page load'
     else
       alert 'No IN on pjax node (<pjax id="main">...)'
 
@@ -293,15 +321,15 @@ class ResponsePage
 
 class PjaxHistory
   @replaceState: ->
-    window.history.replaceState({ title: document.title, main: Pjax.node().innerHTML }, document.title, location.href)
+    window.history.replaceState({ title: document.title }, document.title, location.href)
 
   # add current page to history
   @addCurrent: (href) ->
-    window.history.pushState({ title: document.title, main: Pjax.node().innerHTML }, document.title, href)
+    window.history.pushState({ title: document.title }, document.title, href)
 
   @loadFromHistory: (event) ->
-    if event.state.main
-      ResponsePage.set event.state.title, event.state.main
+    if event.state && event.state.main
+      ResponsePage.set event.state.title, null
     else
       Pjax.load Pjax.path(), no_history: true
 

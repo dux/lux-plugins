@@ -1,3 +1,5 @@
+# DB tree structures via postgress array
+
 module ModelTree
   def self.included base
     expected = 'integer[]'
