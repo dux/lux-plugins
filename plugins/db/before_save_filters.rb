@@ -20,16 +20,16 @@ module Sequel::Plugins::LuxBeforeSave
       end
 
       # delete cache key if defined
-      Lux.cache.delete(cache_key)
+      Lux.cache.delete "#{self.class}/#{id}"
 
       super
     end
 
     def before_destroy
-      Lux.cache.delete(cache_key)
+      Lux.cache.delete "#{self.class}/#{id}"
       super
     end
   end
 end
 
-Sequel::Model.plugin :lux_before_save
+# Sequel::Model.plugin :lux_before_save

@@ -85,6 +85,7 @@ if $0.ends_with?('/rake') || ENV['DUXSTRANO'] == 'true'
       puts '-'
     end
 
+    # invoke local rake command
     def invoke name
       local 'rake %s' % name
     end

@@ -142,7 +142,10 @@ window.Pjax = class Pjax
     true
 
   redirect: ->
-    if Pjax.use_document_write
+    if @href && !@href.includes(location.host)
+      # if page is on a foreign server, open it in new window
+      window.open @href
+    else if Pjax.use_document_write
       document.open()
       document.write(@response)
       document.close()
@@ -213,15 +216,13 @@ window.Pjax = class Pjax
           @href.splice(0, 3)
           @href = '/' + @href.join('/')
 
+        # add history
         unless @opts.no_history
-          PjaxHistory.replaceState()
+          #  PjaxHistory.replaceState()
+          PjaxHistory.addCurrent(@href)
 
         # inject response in current page and process if ok
         if ResponsePage.inject(@response, @opts)
-          # add history
-          unless @opts.no_history
-            PjaxHistory.addCurrent(@href)
-
           # trigger opts['done'] function
           @opts.done() if typeof(@opts.done) == 'function'
 
@@ -289,13 +290,13 @@ class ResponsePage
   # replace title and main block
   inject_in_current: ->
     if @opts.node
-      if ajax_node = @opts.node.closest('.ajax[path]')
+      if ajax_node = @opts.node.closest('.ajax')
         @opts.no_history = true
 
         ajax_node.setAttribute('path', @opts.path)
 
         ajax_node.innerHTML =
-        if response_ajax_node = @page.getElementsByTagName('ajax')[0]
+        if response_ajax_node = @page.getElementsByClassName('ajax')[0]
            response_ajax_node.innerHTML
         else
           @response
@@ -321,7 +322,10 @@ class ResponsePage
 
 class PjaxHistory
   @replaceState: ->
-    window.history.replaceState({ title: document.title }, document.title, location.href)
+    try
+      window.history.replaceState({ title: document.title, main: Pjax.node().innerHTML }, document.title, location.pathname + location.hash)
+    catch e
+      console.error(e)
 
   # add current page to history
   @addCurrent: (href) ->
@@ -329,7 +333,7 @@ class PjaxHistory
 
   @loadFromHistory: (event) ->
     if event.state && event.state.main
-      ResponsePage.set event.state.title, null
+      ResponsePage.set event.state.title, event.state.main
     else
       Pjax.load Pjax.path(), no_history: true
 
@@ -353,24 +357,24 @@ PjaxOnClick =
       if confirm_node = node.closest('*[confirm]')
         return unless confirm(confirm_node.getAttribute('confirm'))
 
-      # nested onclick events
-      if click_node = node.closest('*[click]') || node.closest('*[onclick]')
-        data = click_node.getAttribute('click') || click_node.getAttribute('onclick')
-        func = new Function(data)
+      if click_node = node.closest('*[click]')
+        func = new Function click_node.getAttribute('click')
 
         if func.bind(click_node)() == false
           return PjaxOnClick.run()
 
+      return if node.closest('*[onclick]')
+
       if href = node.getAttribute 'href'
-        if /^javascript:/.test(href)
-          return
+        klass = ' ' + node.className + ' '
+
+        return if klass.includes(' no-pjax ')
+        return if klass.includes(' direct ')
+        return if /^javascript:/.test(href)
+        return if /bot|googlebot|crawler|spider|robot|crawling/i.test(navigator.userAgent)
 
         if /^\w/.test(href) || node.getAttribute('target')
           return PjaxOnClick.run ->
             window.open(href, node.getAttribute('target') || href.replace(/[^\w]/g, ''))
-
-        klass = ' ' + node.className + ' '
-        return if klass.includes(' no-pjax ')
-        return if klass.includes(' direct ')
 
         PjaxOnClick.run -> Pjax.load href, node: node

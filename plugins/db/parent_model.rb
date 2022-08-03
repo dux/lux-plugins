@@ -59,4 +59,4 @@ module Sequel::Plugins::ParentModel
   end
 end
 
-Sequel::Model.plugin :parent_model
+# Sequel::Model.plugin :parent_model

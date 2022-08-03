@@ -9,10 +9,6 @@ class HtmlTable
     @searches     = []
   end
 
-  def tag
-    HtmlTagBuilder
-  end
-
   def before scope
     scope
   end
@@ -54,7 +50,9 @@ class HtmlTable
 
     if sort = Lux.current.request.params[@sort_param]
       direction, field = sort.split('-', 2)
-      @scope = @scope.order(direction == 'a' ? Sequel.asc(field.to_sym) : Sequel.desc(field.to_sym))
+      if @scope.respond_to?(:order)
+        @scope = @scope.order(direction == 'a' ? Sequel.asc(field.to_sym) : Sequel.desc(field.to_sym))
+      end
     else
       @scope = @default_order.call(@scope) if @default_order
     end
@@ -67,7 +65,7 @@ class HtmlTable
 
     prepare_as_blocks
 
-    tag.table(class: @opts[:class], 'data-fields': @cols.map{ |o| }) do |n|
+    HtmlTag.table(class: @opts[:class], 'data-fields': @cols.map{ |o| }) do |n|
       n.thead do |n|
         n.tr do |n|
           for opts in @cols
@@ -98,12 +96,12 @@ class HtmlTable
               field     = sort.is_a?(Symbol) ? sort : opts[:field]
               direction = Lux.current.request.params[@sort_param].to_s[0, 2] == 'a-' ? 'd-' : 'a-'
 
-              title = tag.span(class: 'table-sort table-sort-%ssort' % direction) do |n|
+              title = HtmlTag.span(class: 'table-sort table-sort-%ssort' % direction) do |n|
                 n.a(href: Url.qs(@sort_param, direction + field.to_s) ) { title }
               end
             end
 
-            n.th(th_opts) { title }
+            n.th title, th_opts
           end
         end
       end
@@ -121,7 +119,7 @@ class HtmlTable
           n.tr(tr_opts.slice(*allowed)) do |n|
             for opts in @cols
               content = render_row object, opts
-              n.td(opts.slice(*allowed)) { content }
+              n.td content, opts.slice(*allowed)
             end
           end
         end

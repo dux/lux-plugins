@@ -18,4 +18,4 @@ module Sequel::Plugins::LuxAfterChange
   end
 end
 
-Sequel::Model.plugin :lux_after_change
+# Sequel::Model.plugin :lux_after_change

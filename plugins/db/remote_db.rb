@@ -3,11 +3,11 @@ module Sequel::Plugins::RemoteDb
 
   module ClassMethods
     def remote_db value
-      rr self.to_s
       LUX_REMOTE_DB[self.to_s] = value
     end
 
     def __modelize data
+      # refactor with self.class.load data
       new.tap do |model|
         model.instance_exec { @values = data }
       end

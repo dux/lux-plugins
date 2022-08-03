@@ -7,7 +7,9 @@ $.delay = (time, func) ->
 # run until function returns true
 $.untilTrue = (func) ->
   unless func()
-    $.delay 100, func
+    setTimeout () =>
+      $.untilTrue func
+    , 100
 
 # capture key press unless in forms
 $.keyPress = (key, func) ->
@@ -67,6 +69,30 @@ $.getScript = (src, check, func) ->
     script.src    = src
     script.onload = func if func
     document.getElementsByTagName('head')[0].appendChild script
+
+# insert script module in the head
+# $.loadModule('https://cdn.skypack.dev/easymde', 'EasyMDE', ()=>{
+#   let editor = new EasyMDE({
+$.loadModule = (src, import_gobal, on_load) ->
+  module_id = 'header_module_' + import_gobal
+  on_load ||= () => true
+
+  unless document.getElementById(module_id)
+    script = document.createElement('script')
+    script.id   = module_id
+    script.type = 'module'
+    script.innerHTML = """
+      import mod from '#{src}';
+      window.#{import_gobal} = mod;
+    """
+    document.getElementsByTagName('head')[0].appendChild script
+
+  $.untilTrue () =>
+    if window[import_gobal]
+      on_load() if on_load
+      true
+
+  src
 
 # parse and execute nested <script> tags
 # we need this for example in svelte, where template {@html data} does nor parse scripts
@@ -293,8 +319,14 @@ $.fn.cancel = ->
     window.event.cancelBubble = true
 
 # searches for parent %ajax node and refreshes with given url
-$.fn.ajax = (path) ->
+$.fn.ajax = (path, new_path) ->
   node = if @hasClass('ajax') then @ else @parents('.ajax')
+
+  if !node[0] && @attr('id')
+    path ||= location.pathname + String(location.search)
+    $.get path, (data) =>
+      html = $("""<div>#{data}</div>""").find('#'+@attr('id')).html()
+      @html html
 
   if path
     node.attr 'path', path
@@ -302,3 +334,9 @@ $.fn.ajax = (path) ->
     path = node.attr 'path'
 
   node.load path
+
+  if new_path
+    if new_path[0] == '?'
+      new_path = location.pathname + new_path
+
+    window.history.pushState({ title: document.title }, document.title, new_path)

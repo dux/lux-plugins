@@ -116,6 +116,8 @@ Sequel::Model.dataset_module do
       where Sequel.lit 'id in (select %s_id from %s where %s_id=%i)' % [n1, cname, n2, obj.id]
     elsif model.db_schema["#{n2}_ids".to_sym]
       where Sequel.lit '%i=any(%s_ids)' % [obj.id, n2]
+    elsif model.db_schema[:parent_key]
+      where(parent_key: obj.key)
     elsif model.db_schema[:model_type]
       # should use parent_id and for_parent(@object)
       where(model_type: obj.class.to_s, model_id: obj.id)

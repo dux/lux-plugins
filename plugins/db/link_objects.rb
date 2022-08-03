@@ -125,4 +125,4 @@ module Sequel::Plugins::LuxLinks
   end
 end
 
-Sequel::Model.plugin :lux_links
+# Sequel::Model.plugin :lux_links

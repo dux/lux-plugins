@@ -9,29 +9,25 @@
 class Sequel::Model
   module ClassMethods
     def include _
-      self.cattr :cache_ttl, nil
+      self.cattr :cache_ttl, class: true
       super
     end
 
     # find will cache all finds in a scope
     def find id
-      return nil if id.blank?
-      Lux.current.cache("#{self}/#{id}", ttl: cattr.cache_ttl) { self.where(id:id).first }
-    end
+      key = "#{to_s}/#{id}"
 
-    # find first and cache it
-    def cached_first filter
-      where_filter = xwhere filter
-      Lux.current.cache(where_filter.sql, ttl: cattr.cache_ttl) { self.where_filter.first }
+      if id.blank?
+        nil
+      elsif cattr.cache_ttl
+        Lux.cache.fetch(key, ttl: cattr.cache_ttl) { self.where(id:id).first }
+      else
+        Lux.current.cache(key) { self.where(id:id).first }
+      end
     end
   end
 
   module InstanceMethods
-    def cache_id full=false
-      keys = [self.class, id]
-      keys.push self[:updated_at].to_f if full
-      keys.join('/')
-    end
   end
 end
 

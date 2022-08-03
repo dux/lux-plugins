@@ -28,10 +28,12 @@ class Sequel::Model
     end
 
     def first_or_create filter, &block
-      first_or_new(filter, &block).save
+      object = first_or_new(filter, &block)
+      object.save unless object.id
+      object
     end
 
-    [:validate, :before_destroy].each do |el|
+    [:validate, :before_create, :before_save, :after_create, :before_destroy, :after_destroy].each do |el|
       eval %[
         def #{el} &block
           define_method :#{el} do
@@ -44,12 +46,16 @@ class Sequel::Model
   end
 
   module InstanceMethods
+    def key
+      "%s/%s" % [self.class, self[:id]]
+    end
+
     def cache_key namespace = nil
       key =
       if self[:updated_at]
         "%s/%s-%s" % [self.class, self[:id], self[:updated_at].to_f]
       else
-        "%s/%s" % [self.class, self[:id]]
+        self.key
       end
 
       namespace ? [key, namespace].join('/') : key

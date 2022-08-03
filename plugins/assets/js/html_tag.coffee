@@ -54,20 +54,3 @@ window.tag = (name, args...) ->
     node.push '>'+data+'</'+name+'>'
 
   node.join('')
-
-# # export
-# flatten = (arr) ->
-#   arr.reduce ((flat, toFlatten) ->
-#     flat.concat if Array.isArray(toFlatten) then flatten(toFlatten) else toFlatten
-#   ), []
-
-# # for JSX transpilers
-# window.React ||=
-#   createElement: (name, opts, ...args) ->
-#     console.log [name, opts, args]
-#     tag name, opts || {}, flatten(args).join('')
-
-
-
-
-

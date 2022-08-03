@@ -33,4 +33,4 @@ module Sequel::Plugins::PrimaryKeys
   end
 end
 
-Sequel::Model.plugin :primary_keys
+# Sequel::Model.plugin :primary_keys

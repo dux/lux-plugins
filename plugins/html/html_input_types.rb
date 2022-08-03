@@ -70,6 +70,8 @@ class HtmlInput
     @opts[:step]  ||= 60
 
     @opts[:type] = 'datetime-local'
+
+    @opts[:style] = 'font-size: 18px; height: 44px;'
     @opts.tag(:input)
   end
 
@@ -202,7 +204,26 @@ class HtmlInput
   end
 
   def as_color
-    @opts.slice(:name, :value).tag 's-input-color'
+    c1 = {}
+    c1[:id]       = @opts[:id]+'1'
+    c1[:type]     = :color
+    c1[:style]    = 'height: 44px; position: relative; top: 11px; margin-right: 10px;'
+    c1[:onchange] = "$('##{@opts[:id]}2').val(this.value).css('background-color', this.value)"
+    c1[:value]    = @opts[:value].or @opts[:placeholder]
+
+    c2 = {}
+    c2[:id]          = @opts[:id]+'2'
+    c2[:type]        = :text
+    c2[:name]        = @opts[:name]
+    c2[:value]       = @opts[:value]
+    c2[:style]       = "background-color:#{@opts[:value]};"
+    c2[:onkeyup]     = "if (this.value && this.value.length==7) { $('##{@opts[:id]}1').val(this.value); $(this).css('background-color', this.value) }"
+    c2[:placeholder] = @opts[:placeholder]
+
+    tag.div style: 'position: relative; top: -12px;' do |n|
+      n.push c1.tag(:input)
+      n.push c2.tag(:input)
+    end
   end
 
   def as_geo
@@ -212,10 +233,10 @@ class HtmlInput
     ret += %[ <a target="new" href="http://maps.google.com/maps?q=loc:#{@opts[:value]}" style="display:block; margin-top:7px;">&nbsp;Show on map</a>]
   end
 
-  def as_html
-    # consider http://prosemirror.net
-    %[<s-pell name="#{@opts[:name]}">#{@opts[:value].to_s.html_safe}</s-pell>]
-  end
+  # def as_html
+  #   # consider http://prosemirror.net
+  #   %[<s-quill-editor name="#{@opts[:name]}">#{@opts[:value].to_s.html_safe}</s-pell>]
+  # end
 
   def as_address
     val = @opts[:value]

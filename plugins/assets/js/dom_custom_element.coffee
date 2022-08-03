@@ -1,5 +1,3 @@
-window._ceh_cache ||= {}
-
 # React to do
 # ReactDOM.render(React.createElement(SomeReactComponent, { foo: 'bar' }), dom_node);
 
@@ -12,6 +10,68 @@ window._ceh_cache ||= {}
 #
 # get closest ajax svelte node
 # Svelte('ajax', this)
+#
+# CustomElement.define({
+#   name: 'foo-bar',
+#   func: (node)=>{ node.innerHTML = 'binded' }
+# })
+# create DOM custom element or polyfil for older browsers
+#
+# Nested nodes - svelte: :inner
+# if you want to have propperly rendered inner nodes that have reactivity, you need this
+#
+# %s-toggle-block{ id: 'mail_form' }
+#   .off
+#     %s-info{ svelte: :inner }
+#       Email is sent
+#   .on
+
+
+window.CustomElement =
+  attributes: (node) ->
+    props = node.getAttribute('data-props')
+
+    if props = node.getAttribute('data-props')
+      # if you want to send nested complex data, best to define as data-props encoded as JSON
+      props = JSON.parse(props)
+    else
+      props = Array.prototype.slice
+        .call(node.attributes)
+        .reduce (h, el) ->
+          h[el.name] = el.value;
+          h
+        , {}
+
+    if node.innerHTML
+      props.html = node.innerHTML
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
+
+      node.innerHTML = ''
+
+    props
+
+  # define custom element
+  define: (name, func) ->
+    if window.customElements
+      window.addEventListener 'DOMContentLoaded', () ->
+        unless customElements.get(name)
+          customElements.define name, class extends HTMLElement
+            attributeChangedCallback: (name, oldValue, newValue) ->
+              console.log('attributeChangedCallback', name, oldValue, newValue)
+            connectedCallback: ->
+              node = @
+
+              while node && node = node.parentNode
+                break if node.nodeName == 'BODY'
+                if node.nodeName.includes('-')
+                  return if node.getAttribute('svelte_binded') != 'true'
+
+              @setAttribute('svelte_binded', 'true')
+
+              func @, CustomElement.attributes(@)
+
 window.Svelte = (name, func) ->
   if func
     if typeof func == 'object'
@@ -37,73 +97,18 @@ window.Svelte = (name, func) ->
 
 # bind Svelte elements
   # bind custom node to class
-Svelte.bind = (name, svelte_klass, klass_opts = {}) ->
-  CustomElement.define name: name, inline: klass_opts.inline, func: (node, opts) ->
-    return if node.is_binded
-    node.is_binded = true
-
-    in_opts = {
-      props: {
-        ...opts,
-        node: node,
-        html: if /\w+/.test(String(node.innerHTML)) then node.innerHTML else ''
-      }
-    }
-
-    node.innerHTML = ''
-    svelte_node = new svelte_klass({ target: node, props: in_opts })
+Svelte.bind = (name, svelte_klass) ->
+  CustomElement.define name, (node, opts) ->
+    svelte_node = new svelte_klass({ target: node, props: { props: opts }})
     node.svelte = svelte_node
 
     # export const component = { global: 'Dialog' }
     if c = svelte_node.component
       if c.global
         window[c.global] = svelte_node
-
-# create DOM custom element or polyfil for older browsers
-window.CustomElement =
-  registred: {}
-  un_registred: {}
-
-  attributes: (node) ->
-    if props = node.getAttribute('data-props')
-      # if you want to send nested complex data, best to define as data-props encoded as JSON
-      JSON.parse(props)
-    else
-      Array.prototype.slice
-        .call(node.attributes)
-        .reduce (h, el) ->
-          h[el.name] = el.value;
-          h
-        , {}
-
-  # define custom element
-  define: ({name, inline, func}) ->
-    @registred[name] = func
-
-    if window.customElements
-      unless customElements.get(name)
-        customElements.define name, class extends HTMLElement
-          attributeChangedCallback: (name, oldValue, newValue) ->
-            console.log('attributeChangedCallback', name, oldValue, newValue)
-          connectedCallback: ->
-            if inline
-              # inline tags are tags with no innerHTML, we initialize faster without animation frame if able
-              func @, CustomElement.attributes(@)
-            else
-              window.requestAnimationFrame =>
-                func @, CustomElement.attributes(@)
-    else
-      @un_registred[name] = func
-
-
-# pollyfill for old browsers (this should never trigger)
-unless window.customElements
-  setInterval =>
-    for name, func of CustomElement.un_registred
-      for node in Array.from(document.querySelectorAll("#{name}:not(.mounted)"))
-        node.classList.add('mounted')
-        func node, CustomElement.attributes(node)
-  , 500
+      for el in (c.preload || [])
+        # <link rel="preload" href="main.js" as="script">
+        alert el
 
 # # bind react elements
 # bind_react: (name, klass) ->

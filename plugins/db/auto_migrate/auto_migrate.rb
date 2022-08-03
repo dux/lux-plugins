@@ -112,6 +112,10 @@ class AutoMigrate
     @object = self.class.db.schema(@table_name).to_h
   end
 
+  def db
+    @@db
+  end
+
   def transaction_do text
     self.class.transaction_do text
   end
@@ -279,17 +283,17 @@ class AutoMigrate
   end
 
   def add_index field
-    type = @table_name.to_s.classify.constantize.new.db_schema[field][:db_type] rescue nil
+    type = db.schema(@table_name).to_h[field.to_sym][:db_type] rescue nil
 
-    begin
+    if type
       if type.index('[]')
-        self.class.db.run %[CREATE INDEX #{@table_name}_#{field}_gin_index on "#{@table_name}" USING GIN ("#{field}");]
+        db.run %[CREATE INDEX if not exists #{@table_name}_#{field}_gin_index on "#{@table_name}" USING GIN ("#{field}");]
         puts " * added array GIN index on #{field}".green
       else
-        DB.add_index(@table_name, field)
+        db.add_index @table_name, field.to_sym, if_not_exists: true
         puts " * added index on #{field}".green
       end
-    rescue; end
+    end
   end
 
   def rename field_old, field_new

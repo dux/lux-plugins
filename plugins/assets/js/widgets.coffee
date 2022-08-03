@@ -23,7 +23,7 @@
 
 # Example code
 # <w-yes_no data-field="yes"></w-yes_no>
-# Widget 'yes_no',
+# Widget 'w-yes_no',
 #   init:
 #     @root = $ @node
 #     @state =
@@ -54,7 +54,6 @@ window.Widget = (name, object) ->
 
 Object.assign Widget,
   inst_id_name: 'widget_id'
-  namespace:    'w'
   registered:   {}
   count:        0
 
@@ -84,7 +83,7 @@ Object.assign Widget,
 
     # create custom HTML element
     # %widget-yes_no{ id: @product.id, object: :products, field: :use_suggestions, state: @product.use_suggestions ? 1 : 0 }
-    CustomElement.define "#{@namespace}-#{name}", (node, opts) ->
+    CustomElement.define name, (node, opts) ->
       Widget.bind(name, node, opts)
 
   # runtime apply registered widget to dom node

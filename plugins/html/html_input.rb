@@ -14,8 +14,8 @@ class HtmlInput
     @opts   = opts.dup
   end
 
-  def tag
-    HtmlTagBuilder
+  def tag *args, &block
+    HtmlTag *args, &block
   end
 
   # .render :name          # @object.name
@@ -110,11 +110,11 @@ class HtmlInput
       end
     else
       for el in data
-        if data[0].respond_to?(:select_name)
+        if el.respond_to?(:select_name)
           ret.push [el.id.to_s, el.select_name]
-        elsif data[0].respond_to?(:name)
+        elsif el.respond_to?(:name)
           ret.push [el.id.to_s, el.name]
-        elsif data[0].kind_of?(Array)
+        elsif el.kind_of?(Array)
           ret.push [el[0].to_s, el[1]]
         elsif data.is_hash?
           ret.push el

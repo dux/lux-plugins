@@ -85,7 +85,7 @@ class Lux::Api
       on_error(e)
     end
 
-    puts response.render.to_jsonp(true) if Lux.config.log_to_stdout
+    Lux.log response.render.to_jsonp(true)
 
     response.render
   end

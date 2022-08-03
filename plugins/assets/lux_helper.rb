@@ -40,24 +40,30 @@ ApplicationHelper.class_eval do
   #   = asset '/assets.js', dynamic: true
   def asset name, opts={}
     if name.include?('//') || opts.delete(:dynamic)
-      asset_tag(name, opts)
-    elsif name[0,1] == '/'
-      name += '?%s' % Digest::SHA1.hexdigest(File.read('./public%s' % name))[0,12]
+      asset_tag name, opts
     else
-      name =
-      if Lux.env.dev?
-        # do not require asset file to exist if in cli env (console, testing)
-        hash_data = Lux.env.cli? ? name : File.read('./public/assets/%s' % name)
-        '/assets/%s?%s' % [name, Digest::SHA1.hexdigest(hash_data)[0,12]]
+      if name[0,1] == '/'
+        name += '?%s' % Digest::SHA1.hexdigest(File.read('./public%s' % name))[0,12]
       else
-        @json ||= JSON.load File.read('./public/manifestx.json')
-        opts[:integrity] = @json['integrity'][name]
-        file = @json['files'][name] || die('File not found')
-        '/assets/%s' % file
+        name =
+        if Lux.env.dev?
+          # do not require asset file to exist if in cli env (console, testing)
+          hash_data = Lux.env.cli? ? name : File.read('./public/assets/%s' % name)
+          '/assets/%s?%s' % [name, Digest::SHA1.hexdigest(hash_data)[0,12]]
+        else
+          @json ||= JSON.load File.read('./public/manifestx.json')
+          opts[:integrity] = @json['integrity'][name]
+          file = @json['files'][name] || die('File not found')
+          '/assets/%s' % file
+        end
       end
-    end
 
-    asset_tag name, opts
+      if root = Lux.secrets[:assets_root]
+        name = [root, name].join
+      end
+
+      asset_tag name, opts
+    end
   end
 
   def asset_tag name, opts={}
@@ -65,7 +71,7 @@ ApplicationHelper.class_eval do
 
     if opts[:as] == :js || name.include?('.js')
       opts[:src] = name
-      opts.tag :script
+      opts.tag(:script).sub('&lt;script', '<script')
     elsif opts[:as] == :css || name.include?('css')
       opts[:href]    = name
       opts[:media] ||= 'all'

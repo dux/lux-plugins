@@ -57,4 +57,4 @@ module Sequel::Plugins::LuxCreateLimit
   end
 end
 
-Sequel::Model.plugin :lux_create_limit
+# Sequel::Model.plugin :lux_create_limit

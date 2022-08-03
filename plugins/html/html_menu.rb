@@ -28,8 +28,8 @@ class HtmlMenu
     opts = { active: opts } unless opts.is_a?(Hash)
 
     test   = opts.delete(:active)
-    test   = block if block
-    test ||= @path == path
+    test ||= block if block
+    test ||= @path == path if test.nil?
 
     active = @is_activated ? false : item_active(test)
 

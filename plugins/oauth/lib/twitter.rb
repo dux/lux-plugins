@@ -1,3 +1,6 @@
+# https://developer.twitter.com/en/docs/authentication/guides/log-in-with-twitter#item1
+# POST https://api.twitter.com/oauth/request_token
+
 class LuxOauth::Twitter < LuxOauth
   # def scope
   #   [
@@ -7,7 +10,7 @@ class LuxOauth::Twitter < LuxOauth
   # end
 
   # def login
-  #   'https://api.twitter.com/oauth/authorize?oauth_token=%s' % @key
+  #   'https://api.twitter.com/oauth/authorize?oauth_token=%s' % @opts.key
   # end
 
   # def format_response opts
@@ -24,8 +27,8 @@ class LuxOauth::Twitter < LuxOauth
   # def callback(session_code)
   #   result = RestClient.post('https://www.linkedin.com/oauth/v2/accessToken', {
   #     grant_type:    'authorization_code',
-  #     client_id:     @key,
-  #     client_secret: @secret,
+  #     client_id:     @opts.key,
+  #     client_secret: @opts.secret,
   #     code:          session_code,
   #     redirect_uri:  redirect_url
   #   })
