@@ -14,12 +14,10 @@
 #   Dialog.close() if window.Dialog
 # Pjax.load('/users/new', no_history: bool, no_scroll: bool, done: ()=>{...})
 
-# to refresh link in container only nameing of dom nodes is imporant
-# functionality rest is automatic, it will refres first .ajax parent by id
-# .ajax{ id: :foo }
+# to refresh link in container, pass current node and have ajax node ready, with id and path
+# .ajax{ id: :foo, path: '/some_dialog_path' }
 #   ...
-#   .ajax
-#     %a{ href: '' }
+#   .div{ onclick: Pjax.load('?q=search_term', node: this) }
 
 window.Pjax = class Pjax
   @is_silent      = false
@@ -158,7 +156,24 @@ window.Pjax = class Pjax
   load: ->
     return false unless @href
 
-    @href = location.pathname + @href if @href[0] == '?'
+    @ajax_node = @opts.node?.closest('.ajax')
+    if @ajax_node
+      @opts.ajax_node = @ajax_node
+      @opts.no_scroll = true unless @opts.no_scroll?
+      @opts.no_history = true unless @opts.no_history?
+
+    if @href[0] == '?'
+      # if href starts with ?
+      if @ajax_node
+        # and we are in ajax node
+        ajax_path = @ajax_node.getAttribute('data-path') || @ajax_node.getAttribute('path')
+        if ajax_path
+          # and ajax path is defined, use it to create full url
+          @href = ajax_path.split('?')[0] + @href
+
+      if @href[0] == '?'
+        # if not modified, use base url
+        @href = location.pathname + @href
 
     return if Pjax.test(@href, @opts) == false
 
@@ -178,7 +193,6 @@ window.Pjax = class Pjax
 
     @opts.req_start_time = (new Date()).getTime()
     @opts.path = @href
-    @opts.no_scroll = true if @opts.node && @opts.node.closest('.ajax')
     @opts.no_scroll = true if delete @opts.scroll == false
 
     headers = {}
@@ -249,7 +263,7 @@ class ResponsePage
     if main_node = Pjax.node()
       document.title      = title || 'no page title (pjax)'
       Pjax.before()
-      main_node.innerHTML = main_data
+      main_node.innerHTML = main_data if main_data
       @parseScripts()
       Pjax.after()
 
@@ -289,34 +303,34 @@ class ResponsePage
 
   # replace title and main block
   inject_in_current: ->
-    if @opts.node
-      if ajax_node = @opts.node.closest('.ajax')
-        @opts.no_history = true
+    if ajax_node = @opts.ajax_node
+      ajax_node.setAttribute('data-path', @opts.path)
+      ajax_node.removeAttribute('path')
 
-        ajax_node.setAttribute('path', @opts.path)
-
-        ajax_node.innerHTML =
-        if response_ajax_node = @page.getElementsByClassName('ajax')[0]
-           response_ajax_node.innerHTML
-        else
-          @response
-
-        return true
-
-    unless node = @node()
-      Pjax.info('No <pjax id="foo"> or <div class="pjax" id="foo"> node in response page')
-      return false
-
-    if node.id
-      if node.id == Pjax.node().id
-        ResponsePage.set @extract('title').HTML, node.innerHTML
-        return true
+      ajax_data = if ajax_id = ajax_node.getAttribute('id')
+        @page.querySelector('#'+ajax_id)?[0]
       else
-        Pjax.error 'template_id mismatch, full page load'
-    else
-      alert 'No IN on pjax node (<pjax id="main">...)'
+        @page.querySelector('.ajax')?[0]
 
-    false
+      if ajax_data
+        ajax_data = ajax_data.innerHTML
+      else
+        ajax_data = @response
+
+      ajax_node.innerHTML = ajax_data
+      ResponsePage.parseScripts()
+    else
+      node = @node()
+
+      if node
+        if node.id == Pjax.node().id
+          ResponsePage.set @extract('title').HTML, node.innerHTML
+        else
+          Pjax.error 'template_id mismatch, full page load (use no-pjax as a class name)'
+      else
+        alert 'No IN on pjax node (<pjax id="main">...)'
+
+    true
 
 #
 

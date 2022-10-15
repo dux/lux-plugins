@@ -123,8 +123,10 @@ if $0.ends_with?('/rake') || ENV['DUXSTRANO'] == 'true'
       sync.push %w{./.env ./.git/* ./.gems/* ./log/* tmp/* node_modules/* ./cache/*}
         .map { |it| "--exclude '%s'" % it.sub(/^\.\//, folder) }
         .join(' ')
-      sync.push "#{source} #{@host.user}@#{@host.ip}:#{@host.path}#{destination}/"
-      local sync.join(' ')
+      sync.push "#{source} #{@host.user}@#{@host.ip}:#{@host.path}/#{destination}/"
+      sync = sync.join(' ').gsub('//', '/')
+
+      local sync
     end
 
     # upload a file

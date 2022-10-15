@@ -57,6 +57,7 @@ window.CustomElement =
     if window.customElements
       window.addEventListener 'DOMContentLoaded', () ->
         unless customElements.get(name)
+          # console.log('define: ' + name)
           customElements.define name, class extends HTMLElement
             attributeChangedCallback: (name, oldValue, newValue) ->
               console.log('attributeChangedCallback', name, oldValue, newValue)
@@ -86,7 +87,9 @@ window.Svelte = (name, func) ->
           func.bind(el.svelte)()
   else if typeof(name) == 'string'
     elements = document.getElementsByTagName("s-#{name}")
-    alert("""Globed more then one svelte "#{name}" component""") if elements[1]
+
+    if elements[1]
+      alert("""Globed more then one svelte "#{name}" component""")
 
     if el = elements[0]
       el.svelte

@@ -53,7 +53,7 @@ ApplicationHelper.class_eval do
         else
           @json ||= JSON.load File.read('./public/manifestx.json')
           opts[:integrity] = @json['integrity'][name]
-          file = @json['files'][name] || die('File not found')
+          file = @json['files'][name] || die('Asset error: File "%s" not found' % name)
           '/assets/%s' % file
         end
       end

@@ -18,6 +18,8 @@
 # end
 
 class HtmlFilter
+  HtmlTag self
+
   def initialize parent
     @parent = parent
     @out    = []
@@ -34,10 +36,6 @@ class HtmlFilter
 
   def params
     @parent.params
-  end
-
-  def tag
-    HtmlTagBuilder
   end
 
   def onsubmit what

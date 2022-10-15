@@ -54,5 +54,7 @@ if Lux.config.logger_default
     end
   end
 
-  Lux.config.sequel_dbs.each {|db| db.loggers << logger }
+  if ENV['RAKE_ENV'] != 'test' || ENV['DB_LOG'] == 'true'
+    Lux.config.sequel_dbs.each {|db| db.loggers << logger }
+  end
 end
