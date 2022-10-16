@@ -6,11 +6,11 @@
 
 # Pjax.captureOnClick()
 # Pjax.error = (msg) -> Info.error msg
-# Pjax.noScrollOn('.no-scroll', '.menu-heading', '.skill', ()=>{ ... })
 # Pjax.before ->
-#   InlineDialog.save()
+#
+#   Dialog.close()
+#   InlineDialog.close()
 # Pjax.after ->
-#   InlineDialog.restore() if window.InlineDialog
 #   Dialog.close() if window.Dialog
 # Pjax.load('/users/new', no_history: bool, no_scroll: bool, done: ()=>{...})
 
@@ -20,10 +20,33 @@
 #   .div{ onclick: Pjax.load('?q=search_term', node: this) }
 
 window.Pjax = class Pjax
-  @is_silent      = false
-  @no_scroll_list = ['.no-scroll']
-  @paths_to_skip  = []
+  @config = {
+    # shoud Pjax log info to console
+    is_silent      : parseInt(location.port) < 1000,
 
+    # do not scroll to top, use refresh() and not reload() on node with selectors
+    no_scroll_selector : ['.no-scroll'],
+
+    # skip pjax on followin links and do location.href = target
+    # you can add function, regexp of string (checks for starts with)
+    paths_to_skip  : [],
+
+    # if link has any of this classes, Pjax will be skipped and link will be followed
+    # Example: %a.direct{ href: '/somewhere' } somewhere
+    no_pjax_class  : ['no-pjax', 'direct'],
+
+    # if parent id found with ths class, ajax response data will be loaded in this class
+    # you can add ID for better targeting. If no ID given to .ajax class
+    #  * if response contains .ajax, first node found will be selected and it innerHTML will be used for replacement
+    #  * if there is no .ajax in response, full page response will be used
+    # Example: all links in "some_template" will refresh ".ajax" block only
+    # .ajax
+    #   = render 'some_template'
+    ajax_selector  : '.ajax',
+  }
+
+  # you have to call this if you want to capture clicks on document level
+  # Example: Pjax.onDocumentClick()
   @onDocumentClick: ->
     document.addEventListener 'click', PjaxOnClick.main
 
@@ -41,14 +64,24 @@ window.Pjax = class Pjax
     pjax = new Pjax(href, opts || {})
     pjax.load()
 
+  # used to get full page path
   @path: ->
     location.pathname+location.search
 
   # refresh page, keep scroll
   @refresh: (func) ->
     if typeof func == 'string'
+      # refresh page with direct path
+      # example: Pjax.refresh('?q=some-string')
       Pjax.load(func, { no_scroll: true })
+    else if typeof func == 'object'
+      # dom node given
+      # example: Pjax.refresh($('#side-dialog-main')[0])
+      ajax_path = func.getAttribute('data-path') || func.getAttribute('path')
+      Pjax.load ajax_path, node: func
     else
+      # refresh current page
+      # example: Pjax.refresh()
       Pjax.load(Pjax.path(), { no_scroll: true, done: func })
 
   # reload, jump to top, no_cache http request forced
@@ -58,82 +91,30 @@ window.Pjax = class Pjax
   @node: ->
     document.getElementsByTagName('pjax')[0] || document.getElementsByClassName('pjax')[0] || alert('.pjax or #pjax not found')
 
-  # send info to a client
-  @info: (data) ->
-    msg = "Pjax info: #{data}"
-    console.log msg
-    alert msg unless @is_silent
-
   @console: (msg) ->
-    unless @is_silent
+    unless @config.is_silent
       console.log msg
-
-  # Pjax.init ->
-  #  Widget.bind()
-  #  Dialog.close()
-  #  ga('send', 'pageview') if window.ga;
-  # init Pjax with function that will run after every pjax request
-  @init: (func) -> @after func
-  @after: (func) ->
-    if func
-      @after_func = func
-      func()
-    else
-      @after_func() if @after_func
-
-  # replace with real page reload init func
-  @before: (func) ->
-    if func
-      @before_func = func
-    else if @before_func
-      @before_func()
-    else
-      true
 
   # execute action before pjax load and do not proceed if return is false
   # example, load dialog links inside the dialog
-  # Pjax.test (href, opts) ->
+  # Pjax.before (href, opts) ->
   #   if opts.node
   #     if opts.node.closest('.in-popup')
   #       Dialog.load href
   #       return false
   #   true
-  @test: (arg1, arg2) ->
-    if arg2
-      if @test_func
-        @test_func(arg1, arg2)
-      else
-        true
-    else
-      @test_func = arg1 if typeof arg1 == 'function'
-
-  # do not scroll to top, use refresh() and not reload() on node with classes
-  # Pjax.noScrollOn('.no-scroll', '.menu-heading', '.skill')
-  @noScrollOn: ->
-    @no_scroll_list = arguments
-
-  # overload to add filters
-  # Pjax.beforeLoad(@href, @opts.node)
-  @beforeLoad: ->
+  @before: (func) ->
     true
 
-  @no_scroll_check: (node) ->
-    return unless node && node.closest
+  # execute action after pjax load
+  @after: (func) ->
+    true
 
-    for el in @no_scroll_list
-      return true if node.closest(el)
-
-    false
-
-  # skip pjax on followin links and do location.href = target
-  # Pjax.skip('/admin', '/login')
-  @skip: ->
-    for el in arguments
-      @paths_to_skip.push el
-
+  # error logger, replace as fitting
   @error: (msg) ->
     console.error "Pjax error: #{msg}"
 
+  # internal to check scripts
   @parseScripts: () ->
     for script_tag in Pjax.node().getElementsByTagName('script')
       unless script_tag.getAttribute('src')
@@ -144,19 +125,27 @@ window.Pjax = class Pjax
           func()
           script_tag.innerText = '1;'
 
-  ###########
+  # internal
+  @no_scroll_check: (node) ->
+    return unless node && node.closest
+
+    for el in @config.no_scroll_selector
+      return true if node.closest(el)
+
+    false
+
+  # instance methods
 
   constructor: (@href, @opts) ->
+    @opts.no_scroll  = true if @opts.scroll == false
+    @opts.no_history = true if @opts.history == false
+    @opts.no_cache   = true if @opts.cache == false
     true
 
   redirect: ->
     if @href && !@href.includes(location.host)
       # if page is on a foreign server, open it in new window
       window.open @href
-    else if Pjax.use_document_write
-      document.open()
-      document.write(@response)
-      document.close()
     else
       location.href = @href
 
@@ -166,7 +155,7 @@ window.Pjax = class Pjax
   load: ->
     return false unless @href
 
-    @ajax_node = @opts.node?.closest('.ajax')
+    @ajax_node = @opts.node?.closest(Pjax.config.ajax_selector)
     if @ajax_node
       @opts.ajax_node = @ajax_node
       @opts.no_scroll = true unless @opts.no_scroll?
@@ -185,7 +174,8 @@ window.Pjax = class Pjax
         # if not modified, use base url
         @href = location.pathname + @href
 
-    return if Pjax.test(@href, @opts) == false
+    if Pjax.before(@href, @opts) == false
+      return
 
     if @href == '#' || (location.hash && location.pathname == @href)
       return
@@ -193,13 +183,11 @@ window.Pjax = class Pjax
     if /^http/.test(@href) || /#/.test(@href) || @is_disabled
       return @redirect()
 
-    for el in Pjax.paths_to_skip
+    for el in Pjax.config.paths_to_skip
       switch typeof el
         when 'object' then return @redirect() if el.test(@href)
         when 'function' then return @redirect() if el(@href)
         else return @redirect() if @href.startsWith(el)
-
-    return if Pjax.beforeLoad(@href, @opts.node) == false
 
     @opts.req_start_time = (new Date()).getTime()
     @opts.path = @href
@@ -272,9 +260,6 @@ window.Pjax = class Pjax
       alert 'No IN on pjax node (<pjax id="main">...)'
       return
 
-    unless Pjax.before()
-      return
-
     rroot = document.createElement('div')
     rroot.innerHTML = @response
 
@@ -285,7 +270,7 @@ window.Pjax = class Pjax
       ajax_data = if ajax_id = ajax_node.getAttribute('id')
         rroot.querySelector('#'+ajax_id)?[0]
       else
-        rroot.querySelector('.ajax')?[0]
+        rroot.querySelector(Pjax.config.ajax_selector)?[0]
 
       if ajax_data
         ajax_data = ajax_data.innerHTML
@@ -299,7 +284,7 @@ window.Pjax = class Pjax
       document.title = title || 'no page title (pjax)'
       main_node.innerHTML = @response
       Pjax.parseScripts()
-      Pjax.after()
+      Pjax.after(@href, @opts)
 
     true
 
@@ -319,17 +304,7 @@ class PjaxHistory
       PjaxHistory.last_href = href
 
   @loadFromHistory: (event) ->
-    if event.state && event.state.main
-      if main_node = Pjax.node()
-        document.title = event.state.title || '?'
-        Pjax.before()
-        main_node.innerHTML = event.state.main
-        Pjax.parseScripts()
-        Pjax.after()
-
-
-    else
-      Pjax.load Pjax.path(), no_history: true
+    Pjax.load Pjax.path(), no_history: true
 
 # handle back button gracefully
 window.onpopstate = PjaxHistory.loadFromHistory
@@ -361,9 +336,9 @@ PjaxOnClick =
 
       if href = node.getAttribute 'href'
         klass = ' ' + node.className + ' '
+        for el in Pjax.config.no_pjax_class
+          return if klass.includes(" #{el} ")
 
-        return if klass.includes(' no-pjax ')
-        return if klass.includes(' direct ')
         return if /^javascript:/.test(href)
         return if /bot|googlebot|crawler|spider|robot|crawling/i.test(navigator.userAgent)
 
