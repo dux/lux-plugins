@@ -134,6 +134,16 @@ window.Pjax = class Pjax
   @error: (msg) ->
     console.error "Pjax error: #{msg}"
 
+  @parseScripts: () ->
+    for script_tag in Pjax.node().getElementsByTagName('script')
+      unless script_tag.getAttribute('src')
+        type = script_tag.getAttribute('type') || 'javascript'
+
+        if type.indexOf('javascript') > -1
+          func = new Function script_tag.innerText
+          func()
+          script_tag.innerText = '1;'
+
   ###########
 
   constructor: (@href, @opts) ->
@@ -232,11 +242,10 @@ window.Pjax = class Pjax
 
         # add history
         unless @opts.no_history
-          #  PjaxHistory.replaceState()
           PjaxHistory.addCurrent(@href)
 
         # inject response in current page and process if ok
-        if ResponsePage.inject(@response, @opts)
+        if @set_data()
           # trigger opts['done'] function
           @opts.done() if typeof(@opts.done) == 'function'
 
@@ -252,65 +261,31 @@ window.Pjax = class Pjax
 
     false
 
-#
+  set_data: ->
+    main_node = Pjax.node()
 
-class ResponsePage
-  @inject: (response, opts) ->
-    response_page = new ResponsePage response, opts
-    response_page.inject_in_current()
+    unless main_node
+      Pjax.error 'template_id mismatch, full page load (use no-pjax as a class name)'
+      return
 
-  @set: (title, main_data) ->
-    if main_node = Pjax.node()
-      document.title      = title || 'no page title (pjax)'
-      Pjax.before()
-      main_node.innerHTML = main_data if main_data
-      @parseScripts()
-      Pjax.after()
+    unless main_node.id
+      alert 'No IN on pjax node (<pjax id="main">...)'
+      return
 
-    else
-      Pjax.info 'No pjax node?'
+    unless Pjax.before()
+      return
 
-  @parseScripts: () ->
-    for script_tag in Pjax.node().getElementsByTagName('script')
-      unless script_tag.getAttribute('src')
-        type = script_tag.getAttribute('type') || 'javascript'
+    rroot = document.createElement('div')
+    rroot.innerHTML = @response
 
-        if type.indexOf('javascript') > -1
-          func = new Function script_tag.innerText
-          func()
-          script_tag.innerText = '1;'
-
-  #
-
-  constructor: (@response, @opts) ->
-    @page = document.createElement('div')
-    @page.innerHTML = @response
-
-  node: ->
-    @page.getElementsByTagName('pjax')[0] || @page.getElementsByClassName('pjax')[0]
-
-  # extract node html + attributes as object from html data
-  extract: (node_name) ->
-    out = {}
-
-    if node = @page.querySelector(node_name)
-      out['HTML'] = node.innerHTML
-
-      for name in node.getAttributeNames()
-        out[name] = node.getAttribute(name)
-
-    out
-
-  # replace title and main block
-  inject_in_current: ->
     if ajax_node = @opts.ajax_node
-      ajax_node.setAttribute('data-path', @opts.path)
+      ajax_node.setAttribute('data-path', @href)
       ajax_node.removeAttribute('path')
 
       ajax_data = if ajax_id = ajax_node.getAttribute('id')
-        @page.querySelector('#'+ajax_id)?[0]
+        rroot.querySelector('#'+ajax_id)?[0]
       else
-        @page.querySelector('.ajax')?[0]
+        rroot.querySelector('.ajax')?[0]
 
       if ajax_data
         ajax_data = ajax_data.innerHTML
@@ -318,17 +293,13 @@ class ResponsePage
         ajax_data = @response
 
       ajax_node.innerHTML = ajax_data
-      ResponsePage.parseScripts()
+      Pjax.parseScripts()
     else
-      node = @node()
-
-      if node
-        if node.id == Pjax.node().id
-          ResponsePage.set @extract('title').HTML, node.innerHTML
-        else
-          Pjax.error 'template_id mismatch, full page load (use no-pjax as a class name)'
-      else
-        alert 'No IN on pjax node (<pjax id="main">...)'
+      title = rroot.querySelector('title')?.innerHTML
+      document.title = title || 'no page title (pjax)'
+      main_node.innerHTML = @response
+      Pjax.parseScripts()
+      Pjax.after()
 
     true
 
@@ -343,11 +314,20 @@ class PjaxHistory
 
   # add current page to history
   @addCurrent: (href) ->
-    window.history.pushState({ title: document.title }, document.title, href)
+    if  PjaxHistory.last_href != href
+      window.history.pushState({ title: document.title }, document.title, href)
+      PjaxHistory.last_href = href
 
   @loadFromHistory: (event) ->
     if event.state && event.state.main
-      ResponsePage.set event.state.title, event.state.main
+      if main_node = Pjax.node()
+        document.title = event.state.title || '?'
+        Pjax.before()
+        main_node.innerHTML = event.state.main
+        Pjax.parseScripts()
+        Pjax.after()
+
+
     else
       Pjax.load Pjax.path(), no_history: true
 
