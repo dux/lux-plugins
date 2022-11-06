@@ -40,7 +40,7 @@ module ApplicationHelper
   end
 
   def files_in_use
-    return unless Lux.config.auto_code_reload
+    return unless Lux.config.code_reload
 
     files = Lux.current.files_in_use.map do |file|
       if file[0,1] == '/'

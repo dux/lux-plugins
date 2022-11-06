@@ -109,6 +109,12 @@ class AutoMigrate
 
     Object.send(:remove_const, klass) if Object.const_defined?(klass)
 
+    @table_indexes = db.fetch(%[SELECT indexname FROM pg_indexes WHERE tablename = '#{@table_name}';])
+      .to_a
+      .map{ _1[:indexname]}
+      .reject{ _1.end_with?('_pkey') }
+      .map{ _1.sub(/_index$/, '').sub('%s_' % @table_name, '') }
+
     @object = self.class.db.schema(@table_name).to_h
   end
 
@@ -285,7 +291,7 @@ class AutoMigrate
   def add_index field
     type = db.schema(@table_name).to_h[field.to_sym][:db_type] rescue nil
 
-    if type
+    if type && !@table_indexes.include?(field.to_s)
       if type.index('[]')
         db.run %[CREATE INDEX if not exists #{@table_name}_#{field}_gin_index on "#{@table_name}" USING GIN ("#{field}");]
         puts " * added array GIN index on #{field}".green

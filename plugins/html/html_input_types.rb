@@ -83,15 +83,14 @@ class HtmlInput
   def as_textarea
     val = @opts.delete(:value) || ''
     val = val.join($/) if val.is_array?
-    comp_style = val.split(/\n/).length + val.length/100
-    comp_style = 6 if comp_style < 6
-    comp_style = 15 if comp_style > 15
-    @opts[:style] = "height:#{comp_style*20}px; #{@opts[:style]};"
-    @opts[:autocomplete]   = :off
-    @opts[:autocorrect]    = :off
-    @opts[:autocapitalize] = :off
-    @opts[:spellcheck]     = :false
-    @opts.tag(:textarea, val)
+    props = {
+      name: @opts[:name],
+      id: @opts[:id],
+      value: val,
+      class: @opts[:class],
+      style: @opts[:style]
+    }
+    { 'data-props'=>props.to_json }.tag('s-textarea')
   end
   alias :as_memo :as_textarea
 
@@ -208,7 +207,7 @@ class HtmlInput
     c1[:type]     = :color
     c1[:style]    = 'height: 44px; position: relative; top: 11px; margin-right: 10px;'
     c1[:onchange] = "$('##{@opts[:id]}2').val(this.value).css('background-color', this.value)"
-    c1[:value]    = @opts[:value].or @opts[:placeholder]
+    c1[:value]    = @opts[:value].or @opts[:placeholder] || '#ffffff'
 
     c2 = {}
     c2[:id]          = @opts[:id]+'2'
@@ -222,6 +221,10 @@ class HtmlInput
     tag.div style: 'position: relative; top: -12px;' do |n|
       n.push c1.tag(:input)
       n.push c2.tag(:input)
+
+      if @opts[:value]
+        n.push %[ &sdot; <span class="btn btn-xs" onclick="$('##{c2[:id]}').val('')">clear</span>]
+      end
     end
   end
 

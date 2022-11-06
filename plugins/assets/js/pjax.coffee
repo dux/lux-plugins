@@ -155,11 +155,13 @@ window.Pjax = class Pjax
   load: ->
     return false unless @href
 
-    @ajax_node = @opts.node?.closest(Pjax.config.ajax_selector)
-    if @ajax_node
-      @opts.ajax_node = @ajax_node
-      @opts.no_scroll = true unless @opts.no_scroll?
-      @opts.no_history = true unless @opts.no_history?
+    if @opts.node && !@opts.node.className.includes('ajax-skip')
+      @ajax_node = @opts.node.closest(Pjax.config.ajax_selector)
+
+      if @ajax_node
+        @opts.ajax_node = @ajax_node
+        @opts.no_scroll = true unless @opts.no_scroll?
+        @opts.no_history = true unless @opts.no_history?
 
     if @href[0] == '?'
       # if href starts with ?

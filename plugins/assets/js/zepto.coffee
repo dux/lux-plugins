@@ -200,6 +200,9 @@ $.once = (name, func) ->
 $.resizeIframe = (obj) ->
   obj.style.height = obj.contentWindow.document.documentElement.scrollHeight + 'px';
 
+$.d = (obj) ->
+  JSON.stringify obj, null, 2
+
 # add html but do not everwrite ids
 $.fn.xhtml = (data) ->
   id = $(@).attr('id')
