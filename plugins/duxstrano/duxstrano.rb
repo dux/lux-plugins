@@ -120,7 +120,7 @@ if $0.ends_with?('/rake') || ENV['DUXSTRANO'] == 'true'
       end
 
       sync = ['rsync -rph --executability --delete']
-      sync.push %w{./.env ./.git/* ./.gems/* ./log/* tmp/* node_modules/* ./cache/*}
+      sync.push %w{./.env ./.git/* ./.gems/* log/* tmp/* node_modules/* ./cache/*}
         .map { |it| "--exclude '%s'" % it.sub(/^\.\//, folder) }
         .join(' ')
       sync.push "#{source} #{@host.user}@#{@host.ip}:#{@host.path}/#{destination}/"

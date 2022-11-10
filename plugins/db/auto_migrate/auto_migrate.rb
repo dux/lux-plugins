@@ -78,7 +78,7 @@ class AutoMigrate
       schema, opts = Typero.schema(klass, :with_opts) || raise('Schema "%s" not found' % name)
 
       migrate opts[:db] || DB do
-        table name do |f|
+        table name, schema.rules do |f|
           for args in schema.db_schema
             f.send *args
           end
@@ -167,16 +167,28 @@ class AutoMigrate
     # remove extra fields
     if @opts[:drop].class != FalseClass
       for field in (@object.keys - @fields.keys - [:id])
-        print "Remove colum #{@table_name}.#{field} (y/N): ".light_blue
-        if Lux.env.production? || STDIN.gets.chomp.downcase.index('y')
-          self.class.db.drop_column @table_name, field
-          puts " drop_column #{field}".green
+        was_name = @opts.select { _2.dig(:meta, :was) == field }.keys.first
+
+        unless was_name
+          print "Remove colum #{@table_name}.#{field} (y/N): ".light_blue
+          if Lux.env.production? || STDIN.gets.chomp.downcase.index('y')
+            self.class.db.drop_column @table_name, field
+            puts " drop_column #{field}".green
+          end
         end
       end
     end
 
     # loop trough defined fields in schema
     for field, opts_in in @fields
+      was_name = @opts.dig field, :meta, :was
+
+      # site_id meta: { was: :org_id }
+      if was_name && !@object[field.to_sym]
+        rename was_name, field
+        next
+      end
+
       type = opts_in[0]
       opts = opts_in[1]
 
@@ -303,14 +315,9 @@ class AutoMigrate
   end
 
   def rename field_old, field_new
-    existing_fields = @table_name.to_s.classify.constantize.new.columns
-
-    if existing_fields.index(field_old.to_sym) && ! existing_fields.index(field_new.to_sym)
-      self.class.db.rename_column(@table_name, field_old, field_new)
-      puts " * renamed #{@table_name}.#{field_old} to #{@table_name}.#{field_new}"
-      puts ' * please run auto migration again'
-      exit
-    end
+    log_run "ALTER TABLE #{@table_name} RENAME COLUMN #{field_old} TO #{field_new}"
+    puts " * renamed #{@table_name}.#{field_old} to #{@table_name}.#{field_new}"
+    puts ' * please run auto migration again'
   end
 
   def method_missing type, *args

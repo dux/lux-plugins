@@ -52,7 +52,8 @@ ApplicationHelper.class_eval do
           '/assets/%s?%s' % [name, Digest::SHA1.hexdigest(hash_data)[0,12]]
         else
           @json ||= JSON.load File.read('./public/manifestx.json')
-          opts[:integrity] = @json['integrity'][name]
+          # cloudflare changes files on the fly and fcks up integrity check, have to disable
+          # opts[:integrity] = @json['integrity'][name]
           file = @json['files'][name] || die('Asset error: File "%s" not found' % name)
           '/assets/%s' % file
         end

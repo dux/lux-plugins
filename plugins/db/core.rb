@@ -79,7 +79,7 @@ class Sequel::Model
     end
 
     def parent_model
-      model_type.constantize.find(model_id)
+      @parent_model ||= model_type.constantize.find(model_id)
     end
 
     # has?(:name, "Name is not defined") -> errors.add("Name is not defined")
