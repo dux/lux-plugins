@@ -26,12 +26,14 @@
 #       Email is sent
 #   .on
 
+counter = 1
 
 window.CustomElement =
   attributes: (node) ->
     props = node.getAttribute('data-props')
 
     if props = node.getAttribute('data-props')
+      node.removeAttribute('data-props')
       # if you want to send nested complex data, best to define as data-props encoded as JSON
       props = JSON.parse(props)
     else
@@ -50,6 +52,10 @@ window.CustomElement =
 
       node.innerHTML = ''
 
+    id = node.getAttribute('id') || "svelte-block-#{counter++}"
+    node.setAttribute('id', id)
+    props._id ||= id
+
     props
 
   # define custom element
@@ -57,19 +63,16 @@ window.CustomElement =
     if window.customElements
       window.addEventListener 'DOMContentLoaded', () ->
         unless customElements.get(name)
-          # console.log('define: ' + name)
           customElements.define name, class extends HTMLElement
             attributeChangedCallback: (name, oldValue, newValue) ->
               console.log('attributeChangedCallback', name, oldValue, newValue)
             connectedCallback: ->
-              node = @
-
-              while node && node = node.parentNode
-                break if node.nodeName == 'BODY'
-                if node.nodeName.includes('-')
-                  return if node.getAttribute('svelte_binded') != 'true'
-
-              @setAttribute('svelte_binded', 'true')
+              # node = @
+              # while node && node = node.parentNode
+              #   break if node.nodeName == 'BODY'
+              #   if node.nodeName.includes('-')
+              #     if node.getAttribute('dom_node_binded') != 'true'
+              #       return
 
               func @, CustomElement.attributes(@)
 

@@ -5,15 +5,17 @@ module HtmlHelper
   def paginate list, in_opts = {}
     in_opts[:first] ||= '&bull;'
 
-    if list.is_a?(Hash)
-      opts = list
+    opts = if list.is_a?(Hash)
+      list
     else
       return unless list.respond_to?(:paginate_next)
 
-      opts = {
-        param: list.paginate_param,
-        page:  list.paginate_page,
-        next:  list.paginate_next
+      {
+        param:    list.paginate_param,
+        page:     list.paginate_page,
+        next:     list.paginate_next,
+        last_id:  list.paginate_last_id,
+        first_id: list.paginate_first_id
       }
     end
 
@@ -23,6 +25,7 @@ module HtmlHelper
 
     if opts[:page] > 1
       url = Url.current
+      # opts[:page] == 1 ? url.delete(opts[:param]) : url.qs(opts[:param], '%s-d-%s' % [opts[:page]-1, opts[:first_id]])
       opts[:page] == 1 ? url.delete(opts[:param]) : url.qs(opts[:param], opts[:page]-1)
       ret.push %[<a href="#{url.relative}">&larr;</a>]
     else
@@ -61,10 +64,13 @@ Sequel::Model.dataset_module do
     has_next = ret.length == size + 1
     ret.pop if has_next
 
-    ret.define_singleton_method(:paginate_param) do; param ;end
-    ret.define_singleton_method(:paginate_page)  do; page; end
-    ret.define_singleton_method(:paginate_next)  do; has_next; end
-    ret.define_singleton_method(:paginate_opts)  do; ({ param: param, page: page, next: has_next }); end
+    ret.define_singleton_method(:paginate_param)    do; param ;end
+    ret.define_singleton_method(:paginate_page)     do; page; end
+    ret.define_singleton_method(:paginate_next)     do; has_next; end
+    ret.define_singleton_method(:paginate_first_id) do; ret.first.id rescue nil; end
+    ret.define_singleton_method(:paginate_last_id)  do; ret.last.id rescue nil; end
+    ret.define_singleton_method(:paginate_opts)     do; ({ param: param, page: page, next: has_next }); end
     ret
   end
+  alias :paginate :page
 end

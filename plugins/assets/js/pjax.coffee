@@ -69,7 +69,7 @@ window.Pjax = class Pjax
     location.pathname+location.search
 
   # refresh page, keep scroll
-  @refresh: (func) ->
+  @refresh: (func, opts) ->
     if typeof func == 'string'
       # refresh page with direct path
       # example: Pjax.refresh('?q=some-string')
@@ -143,7 +143,9 @@ window.Pjax = class Pjax
     true
 
   redirect: ->
-    if @href && !@href.includes(location.host)
+    @href ||= location.href
+
+    if @href[0] == 'h' && !@href.includes(location.host)
       # if page is on a foreign server, open it in new window
       window.open @href
     else
@@ -155,7 +157,7 @@ window.Pjax = class Pjax
   load: ->
     return false unless @href
 
-    if @opts.node && !@opts.node.className.includes('ajax-skip')
+    if @opts.node && !@opts.node.className.includes('ajax-skip') && !@opts.node.className.includes('skip-ajax')
       @ajax_node = @opts.node.closest(Pjax.config.ajax_selector)
 
       if @ajax_node
@@ -259,7 +261,7 @@ window.Pjax = class Pjax
       return
 
     unless main_node.id
-      alert 'No IN on pjax node (<pjax id="main">...)'
+      alert 'No ID attribute on pjax node'
       return
 
     rroot = document.createElement('div')
@@ -284,9 +286,12 @@ window.Pjax = class Pjax
     else
       title = rroot.querySelector('title')?.innerHTML
       document.title = title || 'no page title (pjax)'
-      main_node.innerHTML = @response
-      Pjax.parseScripts()
-      Pjax.after(@href, @opts)
+      if new_body = rroot.querySelector('#'+main_node.id)?.innerHTML
+        main_node.innerHTML = new_body
+        Pjax.parseScripts()
+        Pjax.after(@href, @opts)
+      else
+        return false
 
     true
 

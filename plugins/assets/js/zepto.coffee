@@ -322,7 +322,7 @@ $.fn.cancel = ->
     window.event.cancelBubble = true
 
 # searches for parent %ajax node and refreshes with given url
-$.fn.ajax = (path, new_path) ->
+$.fn.ajax = (path, path_state) ->
   node = if @hasClass('ajax') then @ else @parents('.ajax')
 
   if !node[0] && @attr('id')
@@ -338,8 +338,9 @@ $.fn.ajax = (path, new_path) ->
 
   node.load path
 
-  if new_path
-    if new_path[0] == '?'
-      new_path = location.pathname + new_path
+  # set new path state, so back can work in browsers
+  if path_state
+    if path_state[0] == '?'
+      path_state = location.pathname + path_state
 
-    window.history.pushState({ title: document.title }, document.title, new_path)
+    window.history.pushState({ title: document.title }, document.title, path_state)

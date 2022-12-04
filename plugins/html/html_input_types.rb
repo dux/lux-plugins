@@ -214,7 +214,7 @@ class HtmlInput
     c2[:type]        = :text
     c2[:name]        = @opts[:name]
     c2[:value]       = @opts[:value]
-    c2[:style]       = "background-color:#{@opts[:value]};"
+    c2[:style]       = "background-color:#{@opts[:value]}; width: 90px;"
     c2[:onkeyup]     = "if (this.value && this.value.length==7) { $('##{@opts[:id]}1').val(this.value); $(this).css('background-color', this.value) }"
     c2[:placeholder] = @opts[:placeholder]
 

@@ -3,12 +3,6 @@
 
 module Sequel::Plugins::ParentModel
   module InstanceMethods
-    # refresh parent after child is modified
-    def after_change
-      parent.touch if parent?
-      super
-    end
-
     # apply parent attributes
     def parent= model
       if db_schema[:parent_key]

@@ -47,7 +47,7 @@ module Sequel::Plugins::LuxCreateLimit
           current_count = self.class.my.xwhere("created_at > (now() - interval '#{sec_or_field} seconds')").count
         end
 
-        if current_count >= max_count
+        if !Lux.env.test? && current_count >= max_count
           time   = data[1].class == AS::Duration ? data[1].parts[0].to_a.reverse.join(' ') : "#{data[1].to_i/60} minutes"
           name ||= (self.class.display_name.pluralize rescue self.class.to_s.tableize.humanize).downcase
           errors.add(:base, "You are allowed to create max of #{max_count} #{name} in #{time} (Spam protection).")

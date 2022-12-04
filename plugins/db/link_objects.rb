@@ -29,6 +29,7 @@ module Sequel::Plugins::LuxLinks
             @#{name_s}_cached ||= #{klass}.find(#{opts.field})
           end
           def #{name_s}=(object)
+            self[:#{opts.field}] = object.id
             @#{name_s}_cached = object
           end
         ]
@@ -81,7 +82,7 @@ module Sequel::Plugins::LuxLinks
 
           die "Link field/table not found for #{to_s}.link :#{name}" unless const_defined?(cname)
 
-          comm  = "#{klass}.default.xwhere('id in (select #{klass.tableize.singularize}_id from #{cname.tableize} where #{to_s.tableize.singularize}_id=?)', id)"
+          comm = "#{klass}.default.xwhere('id in (select #{klass.tableize.singularize}_id from #{cname.tableize} where #{to_s.tableize.singularize}_id=?)', id)"
           # puts "* #{to_s}.link :#{name} -> #{comm}"
         end
 

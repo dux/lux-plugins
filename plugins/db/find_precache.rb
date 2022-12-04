@@ -17,12 +17,14 @@ class Sequel::Model
     def find id
       key = "#{to_s}/#{id}"
 
-      if id.blank?
-        nil
-      elsif cattr.cache_ttl
-        Lux.cache.fetch(key, ttl: cattr.cache_ttl) { self.where(id:id).first }
-      else
-        Lux.current.cache(key) { self.where(id:id).first }
+      Lux.current.cache key do
+        if cattr.cache_ttl
+          Lux.cache.fetch(key, ttl: cattr.cache_ttl) do
+            self.where(id:id).first
+          end
+        else
+          self.where(id:id).first
+        end
       end
     end
   end
