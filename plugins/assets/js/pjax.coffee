@@ -19,6 +19,16 @@
 #   ...
 #   .div{ onclick: Pjax.load('?q=search_term', node: this) }
 
+# opts: {
+#   path: what path to load
+#   replacePath: path to replace path with (on ajax state change, to have back button on different path)
+#   done: function to execute on done
+#   node: dom node to refresh, finds closest ajax node
+#   scroll: set to false if you want to have no scroll (default for Pjax.refresh)
+#   history: set to false if you dont want to add state change to history
+#   cache: set to false if you want to force no-cache header
+# }
+
 window.Pjax = class Pjax
   @config = {
     # shoud Pjax log info to console
@@ -55,38 +65,77 @@ window.Pjax = class Pjax
   # no_scroll: bool
   # done: ()=>{...}
   @load: (href, opts) ->
-    if Pjax.noCache
-      Pjax.noCache  = false
+    opts = @getOpts href, opts
+    @fetch(opts)
 
-      opts = opts || {}
-      opts.no_cache = true
+  # refresh page, keep scroll
+  @refresh: (func, opts) ->
+    opts = @getOpts func, opts
+    opts.no_scroll = true
+    @fetch(opts)
 
-    pjax = new Pjax(href, opts || {})
+  # reload, jump to top, no_cache http request forced
+  @reload: (opts) ->
+    opts = @getOpts opts
+    opts.no_cache = true
+    @fetch(opts)
+
+  # normalize options
+  @getOpts = (path, opts) ->
+    opts ||= {}
+
+    if typeof(path) == 'object'
+      if path.nodeName
+        opts.node = path
+      else
+        opts = path
+    else if typeof(path) == 'function'
+      opts.done = path
+    else
+      opts.path = path
+
+    if opts.href
+      opts.path = opts.hred
+      delete opts.href
+
+    opts.path ||= @path()
+
+    if opts.node && !opts.node.className.includes('ajax-skip') && !opts.node.className.includes('skip-ajax')
+      ajax_node = opts.node.closest(Pjax.config.ajax_selector)
+      delete opts.node
+
+      if ajax_node
+        opts.ajax_node = ajax_node
+        opts.no_scroll = true unless opts.no_scroll?
+        opts.no_history = true unless opts.no_history?
+
+    if opts.path[0] == '?'
+      # if href starts with ?
+      if opts.ajax_node
+        # and we are in ajax node
+        ajax_path = opts.ajax_node.getAttribute('data-path') || opts.ajax_node.getAttribute('path')
+
+        if ajax_path
+          # and ajax path is defined, use it to create full url
+          opts.path = ajax_path.split('?')[0] + opts.path
+
+      if opts.path[0] == '?'
+        # if not modified, use base url
+        opts.path = location.pathname + opts.path
+
+    opts.no_scroll  = true if opts.scroll == false
+    opts.no_history = true if opts.history == false
+    opts.no_cache   = true if opts.cache == false
+
+    opts
+
+  @fetch: (opts) ->
+    pjax = new Pjax(opts)
     pjax.load()
 
   # used to get full page path
   @path: ->
     location.pathname+location.search
-
-  # refresh page, keep scroll
-  @refresh: (func, opts) ->
-    if typeof func == 'string'
-      # refresh page with direct path
-      # example: Pjax.refresh('?q=some-string')
-      Pjax.load(func, { no_scroll: true })
-    else if typeof func == 'object'
-      # dom node given
-      # example: Pjax.refresh($('#side-dialog-main')[0])
-      ajax_path = func.getAttribute('data-path') || func.getAttribute('path')
-      Pjax.load ajax_path, node: func
-    else
-      # refresh current page
-      # example: Pjax.refresh()
-      Pjax.load(Pjax.path(), { no_scroll: true, done: func })
-
-  # reload, jump to top, no_cache http request forced
-  @reload: (func) ->
-    Pjax.load(Pjax.path(), { no_cache: true, done: func })
 
   @node: ->
     document.getElementsByTagName('pjax')[0] || document.getElementsByClassName('pjax')[0] || alert('.pjax or #pjax not found')
@@ -136,11 +185,8 @@ window.Pjax = class Pjax
 
   # instance methods
 
-  constructor: (@href, @opts) ->
-    @opts.no_scroll  = true if @opts.scroll == false
-    @opts.no_history = true if @opts.history == false
-    @opts.no_cache   = true if @opts.cache == false
-    true
+  constructor: (@opts) ->
+    @href = @opts.href || @opts.path
 
   redirect: ->
     @href ||= location.href
@@ -156,27 +202,6 @@ window.Pjax = class Pjax
   # load a new page
   load: ->
     return false unless @href
-
-    if @opts.node && !@opts.node.className.includes('ajax-skip') && !@opts.node.className.includes('skip-ajax')
-      @ajax_node = @opts.node.closest(Pjax.config.ajax_selector)
-
-      if @ajax_node
-        @opts.ajax_node = @ajax_node
-        @opts.no_scroll = true unless @opts.no_scroll?
-        @opts.no_history = true unless @opts.no_history?
-
-    if @href[0] == '?'
-      # if href starts with ?
-      if @ajax_node
-        # and we are in ajax node
-        ajax_path = @ajax_node.getAttribute('data-path') || @ajax_node.getAttribute('path')
-        if ajax_path
-          # and ajax path is defined, use it to create full url
-          @href = ajax_path.split('?')[0] + @href
-
-      if @href[0] == '?'
-        # if not modified, use base url
-        @href = location.pathname + @href
 
     if Pjax.before(@href, @opts) == false
       return
@@ -264,6 +289,12 @@ window.Pjax = class Pjax
       alert 'No ID attribute on pjax node'
       return
 
+    if path = @opts.replacePath
+      if path[0] == '?'
+        path = location.pathname + path
+
+      window.history.pushState({ title: document.title }, document.title, path)
+
     rroot = document.createElement('div')
     rroot.innerHTML = @response
 
@@ -286,10 +317,12 @@ window.Pjax = class Pjax
     else
       title = rroot.querySelector('title')?.innerHTML
       document.title = title || 'no page title (pjax)'
+
       if new_body = rroot.querySelector('#'+main_node.id)?.innerHTML
         main_node.innerHTML = new_body
         Pjax.parseScripts()
         Pjax.after(@href, @opts)
+
       else
         return false
 
@@ -306,7 +339,7 @@ class PjaxHistory
 
   # add current page to history
   @addCurrent: (href) ->
-    if  PjaxHistory.last_href != href
+    if PjaxHistory.last_href != href
       window.history.pushState({ title: document.title }, document.title, href)
       PjaxHistory.last_href = href
 

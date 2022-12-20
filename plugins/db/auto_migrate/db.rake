@@ -108,7 +108,7 @@ namespace :db do
     klasses = Typero.schema(type: :model) || raise(StandardError.new('Typero schemas not loaded'))
 
     for klass in klasses
-      AutoMigrate.typero klass
+      Typero::AutoMigrate.typero klass
     end
 
     run_all_in_folder 'db/after'

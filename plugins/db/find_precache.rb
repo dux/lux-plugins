@@ -20,10 +20,10 @@ class Sequel::Model
       Lux.current.cache key do
         if cattr.cache_ttl
           Lux.cache.fetch(key, ttl: cattr.cache_ttl) do
-            self.where(id:id).first
+            self.first id: id
           end
         else
-          self.where(id:id).first
+          self.first id: id
         end
       end
     end
