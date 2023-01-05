@@ -41,6 +41,7 @@ window.CustomElement =
         .call(node.attributes)
         .reduce (h, el) ->
           h[el.name] = el.value;
+          node.removeAttribute(el.name)
           h
         , {}
 
@@ -67,14 +68,24 @@ window.CustomElement =
             attributeChangedCallback: (name, oldValue, newValue) ->
               console.log('attributeChangedCallback', name, oldValue, newValue)
             connectedCallback: ->
+              # to make it little faster, we can try to figure out should we wait for for animation frame
               # node = @
+              # lazy = false
+
               # while node && node = node.parentNode
               #   break if node.nodeName == 'BODY'
               #   if node.nodeName.includes('-')
-              #     if node.getAttribute('dom_node_binded') != 'true'
-              #       return
+              #     lazy = node
+              #     break
 
-              func @, CustomElement.attributes(@)
+              # if lazy
+              #   # console.log("lazy load", lazy.nodeName, name)
+              #   window.requestAnimationFrame => func @, CustomElement.attributes(@)
+              # else
+              #   func @, CustomElement.attributes(@)
+
+              window.requestAnimationFrame =>
+                func @, CustomElement.attributes(@)
 
 window.Svelte = (name, func) ->
   if func
@@ -103,6 +114,7 @@ window.Svelte = (name, func) ->
 
 # bind Svelte elements
   # bind custom node to class
+
 Svelte.bind = (name, svelte_klass) ->
   CustomElement.define name, (node, opts) ->
     svelte_node = new svelte_klass({ target: node, props: { props: opts }})

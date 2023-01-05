@@ -361,8 +361,24 @@ module Typero
             puts " * added index on #{field}".green
           end
         end
+      when :foreign_key
+        local_filed = name.keys.first
+        foreign_table, foreign_id = name.values.first
+        constraint_name = "#{@table_name}_#{foreign_table}_fkey"
+
+        if @@db.tables.include?(foreign_table) # table can be in different database
+          exists = @@db.fetch("SELECT * FROM pg_catalog.pg_constraint where conname='#{constraint_name}' limit 1").to_a
+          unless exists.first
+            command = %{ALTER TABLE #{@table_name} ADD CONSTRAINT "#{constraint_name}" FOREIGN KEY ("#{local_filed}") REFERENCES "#{foreign_table}"("#{foreign_id}") ON DELETE CASCADE}
+            # ALTER TABLE "public"."sites" ADD CONSTRAINT "orgs_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+            push command
+            @@db.run command
+            puts " added foreign_key #{constraint_name} -> #{foreign_table}.#{foreign_id}"
+          end
+        end
       else
-        puts "Unknown special DB type: #{type.to_s.red} (in #{@table_name})"
+        puts " unknown special DB type: #{type.to_s.red} (in #{@table_name})"
       end
     end
 

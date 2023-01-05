@@ -278,14 +278,27 @@ window.Pjax = class Pjax
 
     false
 
-  set_data: ->
-    main_node = Pjax.node()
+  set_title_and_body: ->
+    title = @rroot.querySelector('title')?.innerHTML
+    document.title = title || 'no page title (pjax)'
 
-    unless main_node
+    if new_body = @rroot.querySelector('#'+@main_node.id)?.innerHTML
+      @main_node.innerHTML = new_body
+      Pjax.parseScripts()
+      Pjax.after(@href, @opts)
+      window.history.pushState({ title: document.title }, document.title, @href)
+      true
+    else
+      false
+
+  set_data: ->
+    @main_node = Pjax.node()
+
+    unless @main_node
       Pjax.error 'template_id mismatch, full page load (use no-pjax as a class name)'
       return
 
-    unless main_node.id
+    unless @main_node.id
       alert 'No ID attribute on pjax node'
       return
 
@@ -293,40 +306,33 @@ window.Pjax = class Pjax
       if path[0] == '?'
         path = location.pathname + path
 
-      window.history.pushState({ title: document.title }, document.title, path)
-
-    rroot = document.createElement('div')
-    rroot.innerHTML = @response
+    @rroot = document.createElement('div')
+    @rroot.innerHTML = @response
 
     if ajax_node = @opts.ajax_node
       ajax_node.setAttribute('data-path', @href)
       ajax_node.removeAttribute('path')
 
       ajax_data = if ajax_id = ajax_node.getAttribute('id')
-        rroot.querySelector('#'+ajax_id)?[0]
+        @rroot.querySelector('#'+ajax_id)?[0]
       else
-        rroot.querySelector(Pjax.config.ajax_selector)?[0]
+        @rroot.querySelector(Pjax.config.ajax_selector)?[0]
 
       if ajax_data
         ajax_data = ajax_data.innerHTML
       else
-        ajax_data = @response
+        if @response.includes('<html') && @response.includes('<body')
+          # this happens when you have parent .ajax node, click link, and full page is loaded
+          # without ajax node + ID match. we assume it is full fresh page and reload all
+          # to mitigate that behaviour without ID match, just send partial without <html tag
+          return @set_title_and_body()
+        else
+          ajax_data = @response
 
       ajax_node.innerHTML = ajax_data
       Pjax.parseScripts()
     else
-      title = rroot.querySelector('title')?.innerHTML
-      document.title = title || 'no page title (pjax)'
-
-      if new_body = rroot.querySelector('#'+main_node.id)?.innerHTML
-        main_node.innerHTML = new_body
-        Pjax.parseScripts()
-        Pjax.after(@href, @opts)
-
-      else
-        return false
-
-    true
+      @set_title_and_body()
 
 #
 
@@ -357,9 +363,6 @@ PjaxOnClick =
     false
 
   main: ->
-    # if ctrl or cmd button is pressed
-    return if event.which == 2 || event.metaKey
-
     # self or scoped href, as on %tr row element.
     if node = event.target.closest('*[href]')
       # scoped confirmatoon box
@@ -375,12 +378,17 @@ PjaxOnClick =
       return if node.closest('*[onclick]')
 
       if href = node.getAttribute 'href'
+        # if ctrl or cmd button is pressed
+        if event.which == 2 || event.metaKey
+          return window.open href
+
         klass = ' ' + node.className + ' '
         for el in Pjax.config.no_pjax_class
-          return if klass.includes(" #{el} ")
+          if klass.includes(" #{el} ")
+            return window.href = href
 
         return if /^javascript:/.test(href)
-        return if /bot|googlebot|crawler|spider|robot|crawling/i.test(navigator.userAgent)
+        # return if /bot|googlebot|crawler|spider|robot|crawling/i.test(navigator.userAgent)
 
         if /^\w/.test(href) || node.getAttribute('target')
           return PjaxOnClick.run ->
