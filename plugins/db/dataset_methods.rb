@@ -114,6 +114,8 @@ Sequel::Model.dataset_module do
 
     if (cname.classify.constantize rescue false)
       where Sequel.lit 'id in (select %s_id from %s where %s_id=%i)' % [n1, cname, n2, obj.id]
+    elsif model.db_schema[field_name]
+      where Sequel.lit '%s=%i' % [field_name, obj.id]
     elsif model.db_schema["#{n2}_ids".to_sym]
       where Sequel.lit '%i=any(%s_ids)' % [obj.id, n2]
     elsif model.db_schema[:parent_key]
@@ -121,8 +123,6 @@ Sequel::Model.dataset_module do
     elsif model.db_schema[:model_type]
       # should use parent_id and for_parent(@object)
       where(model_type: obj.class.to_s, model_id: obj.id)
-    elsif model.db_schema[field_name]
-      where Sequel.lit '%s=%i' % [field_name, obj.id]
     elsif obj.class.to_s == 'User'
       if obj.respond_to?(field_name)
         where Sequel.lit '%s=?' % [field_name, obj.id]

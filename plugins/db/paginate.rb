@@ -1,3 +1,28 @@
+# ovo sam ovako da mogu koristiti za sqlite i za pg
+def Paginate set, size: 20, param: :page, page: nil, count: nil, klass: nil
+  page = Lux.current.params[param] if Lux.current.params[param].respond_to?(:to_i)
+  page = page.to_i
+  page = 1 if page < 1
+
+  # ret = paginate(page, size).all
+  ret = set.offset((page-1) * size).limit(size+1).all
+
+  has_next = ret.length == size + 1
+  ret.pop if has_next
+
+  if klass
+    ret = ret.map { klass.new _1 }
+  end
+
+  ret.define_singleton_method(:paginate_param)    do; param ;end
+  ret.define_singleton_method(:paginate_page)     do; page; end
+  ret.define_singleton_method(:paginate_next)     do; has_next; end
+  ret.define_singleton_method(:paginate_first_id) do; ret.first.id rescue nil; end
+  ret.define_singleton_method(:paginate_last_id)  do; ret.last.id rescue nil; end
+  ret.define_singleton_method(:paginate_opts)     do; ({ param: param, page: page, next: has_next }); end
+  ret
+end
+
 module HtmlHelper
   extend self
 
@@ -45,32 +70,15 @@ module HtmlHelper
     ret.push '</div></div>'
     ret.join('')
   end
-
 end
 
 ###
 
-Sequel::Model.db.extension :pagination
+# Sequel::Model.db.extension :pagination
 
 Sequel::Model.dataset_module do
-  def page size: 20, param: :page, page: nil, count: nil
-    page = Lux.current.params[param] if Lux.current.params[param].respond_to?(:to_i)
-    page = page.to_i
-    page = 1 if page < 1
-
-    # ret = paginate(page, size).all
-    ret = offset((page-1) * size).limit(size+1).all
-
-    has_next = ret.length == size + 1
-    ret.pop if has_next
-
-    ret.define_singleton_method(:paginate_param)    do; param ;end
-    ret.define_singleton_method(:paginate_page)     do; page; end
-    ret.define_singleton_method(:paginate_next)     do; has_next; end
-    ret.define_singleton_method(:paginate_first_id) do; ret.first.id rescue nil; end
-    ret.define_singleton_method(:paginate_last_id)  do; ret.last.id rescue nil; end
-    ret.define_singleton_method(:paginate_opts)     do; ({ param: param, page: page, next: has_next }); end
-    ret
+  def page opts = {}
+    Paginate self, **opts
   end
   alias :paginate :page
 end

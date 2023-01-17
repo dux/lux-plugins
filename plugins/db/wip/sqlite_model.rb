@@ -2,123 +2,163 @@
 # # * creates parent class that gets dataset from Thread.current
 # # * recreate all important Sequel class methods
 
-# # create connection and check schema
-# def SqliteModel location
-#   db = Sequel.sqlite location
+# EXAMPLE ON THE END
+# REMEMBER that you have to migrate schema on db init for sqlite
 
-#   SequelTable db, :customers do
-#     col :name, String
-#     col :email, type(:email)
-#     drop :email1
-#   end
+class SqliteModel
+  cattr :db_conn, class: true
 
-#   logger = Logger.new(STDOUT)
-#   logger.formatter = proc {|_, _, _, msg| 'SQLite ' + msg + $/ }
-#   db.loggers.push logger
-#   Thread.current[:sqlite_db] = db
-# end
+  class << self
+    def logger target = nil
+      Logger.new(target || STDOUT).tap do |l|
+        l.formatter = proc {|_, _, _, msg| 'SQLite ' + msg + $/ }
+      end
+    end
 
-# class SqliteModel
-#   class << self
-#     def db
-#       Thread.current[:sqlite_db] ||= SqliteModel(nil)
-#     end
+    def db &block
+      if block
+        cattr.db_conn = block
+      else
+        cattr.db_conn
+      end
+    end
 
-#     def inherited klass
-#       fields = db.schema(dataset klass.to_s.tableize.to_sym).map(&:first)
+    def table name = nil, &block
+      name ||= self.to_s.split('::').last.tableize
+      SequelTable db_conn, name, &block
+    end
 
-#       for el in fields
-#         # create static methods from values in schema
-#         eval %[
-#           #{klass}.class_eval do
-#             def #{el}; @values[:#{el}]; end
-#             def #{el}= val; @values[:#{el}] = val; end
-#           end
-#         ]
+    def inherited klass
+      if klass.db
+        fields = klass.db.schema(table_name(klass)).map(&:first) rescue []
+
+        for el in fields
+          # create static methods from values in schema
+          eval %[
+            #{klass}.class_eval do
+              def #{el}; @values[:#{el}]; end
+              def #{el}= val; @values[:#{el}] = val; end
+            end
+          ]
+        end
+      end
+    end
+
+    def table_name klass = nil
+      (klass || to_s).to_s.split('::').last.tableize.to_sym
+    end
+
+    def dataset name = nil
+      self.db[name || table_name]
+    end
+
+    def create data = {}
+      new(data).save
+    end
+
+    def find id
+      new dataset.where(id: id).first
+    end
+
+    def last
+      new dataset.order(:id).last
+    end
+
+    def where *args
+      dataset.where *args
+    end
+
+    def order str
+      dataset.order(str.class == String ? Sequel.lit(str) : str)
+    end
+
+    def fetch opts = {}
+      out = yield(self)
+      Paginate out, **opts.merge(klass: self)
+    end
+
+    def fetch! opts = {}, &block
+      out = instance_exec(&block)
+      Paginate out, **opts.merge(klass: self)
+    end
+  end
+
+  ###
+
+  def initialize data = {}
+    @values = (data || {}).to_hwia
+  end
+
+  def validate; end
+  def before_destroy; end
+  def after_destroy; end
+
+  def dataset
+    self.class.dataset.where(id: @values[:id])
+  end
+
+  def save
+    validate
+
+    copy = @values.map do |k, v|
+      v = v.to_json if v.class == Hash
+      [k, v]
+    end.to_h
+
+    if @values[:id]
+      copy[:updated_at] = Time.now if respond_to?(:updated_at)
+      copy[:updated_by] = User.current.id if respond_to?(:updated_by)
+      dataset.update copy.except(:id)
+    else
+      copy[:created_at] = Time.now if respond_to?(:created_at)
+      copy[:created_by] = User.current.id if respond_to?(:created_by)
+      @values[:id] = dataset.insert copy
+    end
+
+    self
+  end
+
+  def update data
+    dataset.update data
+    @values = @values.merge data
+    self
+  end
+
+  def destroy
+    dataset.destroy
+  end
+
+  def to_h
+    @values.to_h
+  end
+  alias :attributes :to_h
+end
+
+# def SimpleFeedback
+#   Lux.config[:simple_feedback_sqlite] ||= begin
+#     Sequel.sqlite('./db/sqlite/simple_feedback.sqlite').tap do |db|
+#       db.loggers.push SqliteModel.logger
+
+#       SequelTable db, :feedbacks do
+#         col :name, String
+#         col :email, String
 #       end
 #     end
-
-#     def table_name
-#       to_s.tableize.to_sym
-#     end
-
-#     def dataset name = nil
-#       db[name || table_name]
-#     end
-
-#     def create data
-#       dataset.insert data
-#       self
-#     end
-
-#     def find id
-#       new dataset.where(id: id).first
-#     end
-
-#     def last
-#       dataset.order(:id).last
-#     end
-
-#     def where *args
-#       dataset.where *args
-#     end
-
-#   end
-
-#   ###
-
-#   def initialize data
-#     @values = data
-#   end
-
-#   def validate; end
-#   def before_destroy; end
-#   def after_destroy; end
-
-#   def dataset
-#     self.class.dataset.where(id: @values[:id])
-#   end
-
-#   def save
-#     dataset.update @values.except(:id)
-#     self
-#   end
-
-#   def update data
-#     dataset.update data
-#     @values = @values.merge data
-#     self
-#   end
-
-#   def destroy
-#     dataset.destroy
-#   end
-
-#   def to_h
-#     @values
-#   end
-
-#   def attributes
-#     @values
 #   end
 # end
 
-# class Customer < SqliteModel
+# class SimpleFeedback < SqliteModel
+#   db { SimpleFeedback() }
 # end
 
-# Customer.create name: 'Dux mem', email: 'dux@net.hr'
-# rr Customer.last.to_h
+# class SimpleFeedback
+#   class Feedback < SimpleFeedback
+#   end
+# end
 
-# SqliteModel 'tmp/t3.sqlite'
+# f = SimpleFeedback::Feedback.new
+# f.name = 'Dux %s' % Time.now
+# f.email = '%s@foo.bar' % rand
+# f.save
 
-# Customer.create name: 'Dux disk', email: 'dux@net.hr'
-
-# c1 = Customer.find(1)
-# rr c1.to_h
-# c1.email += 'a'
-# rr c1.email
-# c1.save
-# c1.update name: 'Name %s' % Time.now
-
-# rr Customer.last.to_h
-
+# rr SimpleFeedback::Feedback.dataset.all

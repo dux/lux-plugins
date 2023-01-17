@@ -371,9 +371,7 @@ module Typero
           unless exists.first
             command = %{ALTER TABLE #{@table_name} ADD CONSTRAINT "#{constraint_name}" FOREIGN KEY ("#{local_filed}") REFERENCES "#{foreign_table}"("#{foreign_id}") ON DELETE CASCADE}
             # ALTER TABLE "public"."sites" ADD CONSTRAINT "orgs_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
-
-            push command
-            @@db.run command
+            @@db.run(command) rescue nil
             puts " added foreign_key #{constraint_name} -> #{foreign_table}.#{foreign_id}"
           end
         end
@@ -396,7 +394,7 @@ module Typero
         opts[:scale] ||= 2
         @fields[name.to_sym] = [:decimal, opts]
       else
-        puts "Unknown DB filed type: #{type.to_s.red} (in #{@table_name})"
+        raise "Unknown DB filed type: #{type.to_s.red} (in table: #{@table_name})"
       end
     end
   end

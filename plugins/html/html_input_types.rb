@@ -5,6 +5,7 @@ class HtmlInput
   def as_string
     @opts[:type] = 'text'
     @opts[:autocomplete] ||= 'off'
+
     prefix = @opts.delete(:prefix)
     out = @opts.tag(:input)
     if prefix

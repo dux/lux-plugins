@@ -2,14 +2,13 @@
 # ReactDOM.render(React.createElement(SomeReactComponent, { foo: 'bar' }), dom_node);
 
 # get all <s-filter ...> components and run close() on them
-# window.Svelte('filter', function(){ this.close() })
+# Svelte('filter', function(){ this.close() })
 #
 # get singleton dialog component
-# el = Svelte('dialog')
-# el.close()
+# Svelte('s-dialog').close()
 #
 # get closest ajax svelte node
-# Svelte('ajax', this)
+# Svelte('s-ajax', this)
 #
 # CustomElement.define({
 #   name: 'foo-bar',
@@ -32,7 +31,7 @@ window.CustomElement =
   attributes: (node) ->
     props = node.getAttribute('data-props')
 
-    if props = node.getAttribute('data-props')
+    if props
       node.removeAttribute('data-props')
       # if you want to send nested complex data, best to define as data-props encoded as JSON
       props = JSON.parse(props)
@@ -41,7 +40,8 @@ window.CustomElement =
         .call(node.attributes)
         .reduce (h, el) ->
           h[el.name] = el.value;
-          node.removeAttribute(el.name)
+          # if we remove attrs, then we sometimes have to manually re-add them, as for s-ajax, that expects last path attribute to be present at all times
+          # node.removeAttribute(el.name)
           h
         , {}
 
@@ -53,10 +53,12 @@ window.CustomElement =
 
       node.innerHTML = ''
 
+    node.removeAttribute('style')
+
     id = node.getAttribute('id') || "svelte-block-#{counter++}"
     node.setAttribute('id', id)
-    props._id ||= id
-
+    props ||= {}
+    props._id = id
     props
 
   # define custom element
@@ -68,49 +70,27 @@ window.CustomElement =
             attributeChangedCallback: (name, oldValue, newValue) ->
               console.log('attributeChangedCallback', name, oldValue, newValue)
             connectedCallback: ->
-              # to make it little faster, we can try to figure out should we wait for for animation frame
-              # node = @
-              # lazy = false
-
-              # while node && node = node.parentNode
-              #   break if node.nodeName == 'BODY'
-              #   if node.nodeName.includes('-')
-              #     lazy = node
-              #     break
-
-              # if lazy
-              #   # console.log("lazy load", lazy.nodeName, name)
-              #   window.requestAnimationFrame => func @, CustomElement.attributes(@)
-              # else
-              #   func @, CustomElement.attributes(@)
-
               window.requestAnimationFrame =>
                 func @, CustomElement.attributes(@)
 
 window.Svelte = (name, func) ->
-  if func
-    if typeof func == 'object'
-      if target = func.closest("s-#{name}")
-        target.svelte
-      else
-        null
-    else
-      Array.prototype.slice
-        .call document.getElementsByTagName("s-#{name}")
-        .forEach (el) ->
-          func.bind(el.svelte)()
-  else if typeof(name) == 'string'
-    elements = document.getElementsByTagName("s-#{name}")
+  if typeof func == 'function'
+    # run in scope of svelte blocks
+    Array.prototype.slice
+      .call document.getElementsByTagName(name)
+      .forEach (el) ->
+        func.bind(el.svelte)()
+    return
 
-    if elements[1]
-      alert("""Globed more then one svelte "#{name}" component""")
-
-    if el = elements[0]
-      el.svelte
-    else
-      null
+  target = if func
+    func.closest(name)
   else
-    alert('Svelte error: not supported')
+    document.querySelector(name)
+
+  if target
+    target.svelte || alert('Svelte not bound to DOM node')
+  else
+    alert('Svelte target DOM node not found')
 
 # bind Svelte elements
   # bind custom node to class

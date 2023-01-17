@@ -84,6 +84,10 @@ window.Pjax = class Pjax
   @getOpts = (path, opts) ->
     opts ||= {}
 
+    opts.no_scroll  = true if opts.scroll == false
+    opts.no_history = true if opts.history == false
+    opts.no_cache   = true if opts.cache == false
+
     if typeof(path) == 'object'
       if path.nodeName
         opts.node = path
@@ -123,9 +127,9 @@ window.Pjax = class Pjax
         # if not modified, use base url
         opts.path = location.pathname + opts.path
 
-    opts.no_scroll  = true if opts.scroll == false
-    opts.no_history = true if opts.history == false
-    opts.no_cache   = true if opts.cache == false
+    if opts.replacePath
+      if opts.replacePath[0] == '?'
+        opts.replacePath = location.pathname + path
 
     opts
 
@@ -183,6 +187,13 @@ window.Pjax = class Pjax
 
     false
 
+  @last: ->
+    @lastHref || @path()
+
+  @send_global_event: ->
+    event = new CustomEvent('pjax:page')
+    window.dispatchEvent(event);
+
   # instance methods
 
   constructor: (@opts) ->
@@ -202,6 +213,10 @@ window.Pjax = class Pjax
   # load a new page
   load: ->
     return false unless @href
+
+    # if ctrl or cmd button is pressed, open in new window
+    if event && (event.which == 2 || event.metaKey)
+      return window.open @href
 
     if Pjax.before(@href, @opts) == false
       return
@@ -258,8 +273,8 @@ window.Pjax = class Pjax
           @href = '/' + @href.join('/')
 
         # add history
-        unless @opts.no_history
-          PjaxHistory.addCurrent(@href)
+        if @opts.replacePath || !@opts.no_history
+          PjaxHistory.addCurrent @opts.replacePath || @href
 
         # inject response in current page and process if ok
         if @set_data()
@@ -286,7 +301,7 @@ window.Pjax = class Pjax
       @main_node.innerHTML = new_body
       Pjax.parseScripts()
       Pjax.after(@href, @opts)
-      window.history.pushState({ title: document.title }, document.title, @href)
+      Pjax.send_global_event()
       true
     else
       false
@@ -301,10 +316,6 @@ window.Pjax = class Pjax
     unless @main_node.id
       alert 'No ID attribute on pjax node'
       return
-
-    if path = @opts.replacePath
-      if path[0] == '?'
-        path = location.pathname + path
 
     @rroot = document.createElement('div')
     @rroot.innerHTML = @response
@@ -337,61 +348,60 @@ window.Pjax = class Pjax
 #
 
 class PjaxHistory
-  @replaceState: ->
-    try
-      window.history.replaceState({ title: document.title, main: Pjax.node().innerHTML }, document.title, location.pathname + location.hash)
-    catch e
-      console.error(e)
-
   # add current page to history
   @addCurrent: (href) ->
-    if PjaxHistory.last_href != href
-      window.history.pushState({ title: document.title }, document.title, href)
-      PjaxHistory.last_href = href
+    if Pjax.lastHref == href
+      window.history.replaceState({}, document.title, href);
+    else
+      window.history.pushState({}, document.title, href)
+      Pjax.lastHref = href
 
   @loadFromHistory: (event) ->
-    Pjax.load Pjax.path(), no_history: true
+    setTimeout ->
+      Pjax.load Pjax.path(), history: false
+    , 1
 
 # handle back button gracefully
 window.onpopstate = PjaxHistory.loadFromHistory
 
 PjaxOnClick =
-  run: (func) ->
-    event.stopPropagation()
-    event.preventDefault()
-    func() if func
-    false
-
   main: ->
     # self or scoped href, as on %tr row element.
     if node = event.target.closest('*[href]')
-      # scoped confirmatoon box
-      if confirm_node = node.closest('*[confirm]')
-        return unless confirm(confirm_node.getAttribute('confirm'))
+      event.stopPropagation()
+      event.preventDefault()
 
-      if click_node = node.closest('*[click]')
-        func = new Function click_node.getAttribute('click')
+      href = node.getAttribute 'href'
 
-        if func.bind(click_node)() == false
-          return PjaxOnClick.run()
+      # if ctrl or cmd button is pressed, open in new window
+      if event.which == 2 || event.metaKey
+        return window.open href
 
-      return if node.closest('*[onclick]')
+      # if direct link, do not use Pjax
+      klass = ' ' + node.className + ' '
+      for el in Pjax.config.no_pjax_class
+        if klass.includes(" #{el} ")
+          if /^http/.test(href)
+            window.open(href)
+          else
+            return window.location.href = href
 
-      if href = node.getAttribute 'href'
-        # if ctrl or cmd button is pressed
-        if event.which == 2 || event.metaKey
-          return window.open href
+      # execute inline JS
+      if /^javascript:/.test(href)
+        func = new Function href.replace(/^javascript:/, '')
+        return func()
 
-        klass = ' ' + node.className + ' '
-        for el in Pjax.config.no_pjax_class
-          if klass.includes(" #{el} ")
-            return window.href = href
+      # disable bots
+      # return if /bot|googlebot|crawler|spider|robot|crawling/i.test(navigator.userAgent)
 
-        return if /^javascript:/.test(href)
-        # return if /bot|googlebot|crawler|spider|robot|crawling/i.test(navigator.userAgent)
+      # if target attribute provided, open in new window
+      if /^\w/.test(href) || node.getAttribute('target')
+        return window.open(href, node.getAttribute('target') || href.replace(/[^\w]/g, ''))
 
-        if /^\w/.test(href) || node.getAttribute('target')
-          return PjaxOnClick.run ->
-            window.open(href, node.getAttribute('target') || href.replace(/[^\w]/g, ''))
+      # if everything else fails, call Pjax
+      Pjax.load href, node: node
 
-        PjaxOnClick.run -> Pjax.load href, node: node
+      false
+
+window.addEventListener 'DOMContentLoaded', () ->
+  setTimeout(Pjax.send_global_event, 0)

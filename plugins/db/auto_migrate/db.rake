@@ -5,11 +5,19 @@ def db_backup_file_location args
   "%s/%s.sql" % [folder, name]
 end
 
-def run_all_in_folder in_dir
-  return unless Dir.files(in_dir).first
+def load_file file, external: false
+  info = 'auto_migrate: %s' % file
 
-  puts "* executing #{in_dir} scripts"
-  system "%s/bin/lux e '%s'" % [Lux.fw_root, %{Dir.require_all("./#{in_dir}").map{|el| "* %s" % el }.join($/)}]
+  if !File.exist?(file)
+    info += ' (skipping)'
+    Lux.info info
+  elsif external
+    Lux.info info
+    Lux.run "bundle exec lux e #{file}"
+  else
+    Lux.info info
+    load file
+  end
 end
 
 db_name = Lux.config.db_url.split('/').last
@@ -81,15 +89,13 @@ namespace :db do
   end
 
   desc 'Automigrate schema'
-  task :am do
+  task am: :env do
     class Object
       def self.const_missing klass, path=nil
         eval 'class ::%s; end' % klass,  __FILE__, __LINE__
         Object.const_get(klass)
       end
     end
-
-    run_all_in_folder 'db/before'
 
     Lux.config.migrate = true
 
@@ -103,7 +109,8 @@ namespace :db do
     die('"DB.extension :pg_array" not loaded') unless LuxTest.first.int_array.class == Sequel::Postgres::PGArray
     DB.run %[DROP TABLE IF EXISTS lux_tests;]
 
-    require './db/schema'
+    load_file './db/before.rb'
+    load_file './db/auto_migrate.rb'
 
     klasses = Typero.schema(type: :model) || raise(StandardError.new('Typero schemas not loaded'))
 
@@ -111,6 +118,6 @@ namespace :db do
       Typero::AutoMigrate.typero klass
     end
 
-    run_all_in_folder 'db/after'
+    load_file './db/after.rb', external: true
   end
 end
