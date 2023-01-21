@@ -30,6 +30,7 @@ counter = 1
 window.CustomElement =
   attributes: (node) ->
     props = node.getAttribute('data-props')
+    id = node.getAttribute('id') || "svelte-block-#{counter++}"
 
     if props
       node.removeAttribute('data-props')
@@ -41,7 +42,7 @@ window.CustomElement =
         .reduce (h, el) ->
           h[el.name] = el.value;
           # if we remove attrs, then we sometimes have to manually re-add them, as for s-ajax, that expects last path attribute to be present at all times
-          # node.removeAttribute(el.name)
+          node.removeAttribute(el.name)
           h
         , {}
 
@@ -53,9 +54,9 @@ window.CustomElement =
 
       node.innerHTML = ''
 
-    node.removeAttribute('style')
+    # node.removeAttribute('style')
+    # node.removeAttribute('onclick')
 
-    id = node.getAttribute('id') || "svelte-block-#{counter++}"
     node.setAttribute('id', id)
     props ||= {}
     props._id = id

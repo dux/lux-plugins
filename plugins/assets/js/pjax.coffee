@@ -111,7 +111,6 @@ window.Pjax = class Pjax
       if ajax_node
         opts.ajax_node = ajax_node
         opts.no_scroll = true unless opts.no_scroll?
-        opts.no_history = true unless opts.no_history?
 
     if opts.path[0] == '?'
       # if href starts with ?
@@ -272,10 +271,6 @@ window.Pjax = class Pjax
           @href.splice(0, 3)
           @href = '/' + @href.join('/')
 
-        # add history
-        if @opts.replacePath || !@opts.no_history
-          PjaxHistory.addCurrent @opts.replacePath || @href
-
         # inject response in current page and process if ok
         if @set_data()
           # trigger opts['done'] function
@@ -293,6 +288,14 @@ window.Pjax = class Pjax
 
     false
 
+  # add current page to history
+  historyAddCurrent: (href) ->
+    if Pjax.lastHref == href
+      window.history.replaceState({}, document.title, href);
+    else
+      window.history.pushState({}, document.title, href)
+      Pjax.lastHref = href
+
   set_title_and_body: ->
     title = @rroot.querySelector('title')?.innerHTML
     document.title = title || 'no page title (pjax)'
@@ -302,6 +305,10 @@ window.Pjax = class Pjax
       Pjax.parseScripts()
       Pjax.after(@href, @opts)
       Pjax.send_global_event()
+
+      # add history
+      if @opts.replacePath || !@opts.no_history
+        @historyAddCurrent @opts.replacePath || @href
       true
     else
       false
@@ -345,24 +352,10 @@ window.Pjax = class Pjax
     else
       @set_title_and_body()
 
-#
-
-class PjaxHistory
-  # add current page to history
-  @addCurrent: (href) ->
-    if Pjax.lastHref == href
-      window.history.replaceState({}, document.title, href);
-    else
-      window.history.pushState({}, document.title, href)
-      Pjax.lastHref = href
-
-  @loadFromHistory: (event) ->
-    setTimeout ->
-      Pjax.load Pjax.path(), history: false
-    , 1
-
 # handle back button gracefully
-window.onpopstate = PjaxHistory.loadFromHistory
+window.onpopstate = (event) ->
+  window.requestAnimationFrame ->
+    Pjax.load Pjax.path(), history: false
 
 PjaxOnClick =
   main: ->
