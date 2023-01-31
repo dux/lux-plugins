@@ -84,14 +84,14 @@ class HtmlInput
   def as_textarea
     val = @opts.delete(:value) || ''
     val = val.join($/) if val.is_array?
-    props = {
+
+    App.svelte_tag 's-textarea', {
       name: @opts[:name],
       id: @opts[:id],
       value: val,
       class: @opts[:class],
       style: @opts[:style]
     }
-    { 'data-props'=>props.to_json }.tag('s-textarea')
   end
   alias :as_memo :as_textarea
 
@@ -209,6 +209,7 @@ class HtmlInput
     c1[:style]    = 'height: 44px; position: relative; top: 11px; margin-right: 10px;'
     c1[:onchange] = "$('##{@opts[:id]}2').val(this.value).css('background-color', this.value)"
     c1[:value]    = @opts[:value].or @opts[:placeholder] || '#ffffff'
+    c1[:disabled] = true if @opts[:disabled]
 
     c2 = {}
     c2[:id]          = @opts[:id]+'2'
@@ -218,12 +219,13 @@ class HtmlInput
     c2[:style]       = "background-color:#{@opts[:value]}; width: 90px;"
     c2[:onkeyup]     = "if (this.value && this.value.length==7) { $('##{@opts[:id]}1').val(this.value); $(this).css('background-color', this.value) }"
     c2[:placeholder] = @opts[:placeholder]
+    c2[:disabled]    = true if @opts[:disabled]
 
     tag.div style: 'position: relative; top: -12px;' do |n|
       n.push c1.tag(:input)
       n.push c2.tag(:input)
 
-      if @opts[:value]
+      if @opts[:value] && !@opts[:disabled]
         n.push %[ &sdot; <span class="btn btn-xs" onclick="$('##{c2[:id]}').val('')">clear</span>]
       end
     end

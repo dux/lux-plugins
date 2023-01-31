@@ -166,16 +166,38 @@ window.Pjax = class Pjax
   @error: (msg) ->
     console.error "Pjax error: #{msg}"
 
-  # internal to check scripts
-  @parseScripts: () ->
-    for script_tag in Pjax.node().getElementsByTagName('script')
-      unless script_tag.getAttribute('src')
-        type = script_tag.getAttribute('type') || 'javascript'
+  @parseSingleScript: (id, img) ->
+    img.remove()
+    node = document.getElementById(id)
+    data = node.innerText
+    node.innerText = 1
+    func = new Function data
+    func()
 
-        if type.indexOf('javascript') > -1
-          func = new Function script_tag.innerText
-          func()
-          script_tag.innerText = '1;'
+  # this hack is make inline execution work, like it works in browsers on initial load, seqential
+  # after every script tag, add emppty png that points to script, parse script
+  @parseScripts: (node) ->
+    if typeof node == 'string'
+      duplicate = node
+      node = document.createElement "span"
+      node.innerHTML = duplicate
+
+    for script_tag in node.getElementsByTagName('script')
+      if script_tag
+        unless script_tag.getAttribute('src')
+          type = script_tag.getAttribute('type') || 'javascript'
+
+          if type.indexOf('javascript') > -1
+            unless script_tag.id
+              @script_cnt ||= 0
+              @script_cnt += 1
+              script_tag.id = "app-sc-#{@script_cnt}"
+
+            span = document.createElement "span"
+            span.innerHTML = """<img style="display: none;" src="data:image/gif;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==" onload="Pjax.parseSingleScript('#{script_tag.id}', this)" />"""
+            script_tag.after span
+
+    node.innerHTML
 
   # internal
   @no_scroll_check: (node) ->
@@ -192,6 +214,9 @@ window.Pjax = class Pjax
   @send_global_event: ->
     event = new CustomEvent('pjax:page')
     window.dispatchEvent(event);
+
+  @pushState: (href) ->
+    window.history.pushState({}, document.title, href);
 
   # instance methods
 
@@ -290,6 +315,9 @@ window.Pjax = class Pjax
 
   # add current page to history
   historyAddCurrent: (href) ->
+    return if @opts.no_history
+    return if @history_added; @history_added = true
+
     if Pjax.lastHref == href
       window.history.replaceState({}, document.title, href);
     else
@@ -300,21 +328,26 @@ window.Pjax = class Pjax
     title = @rroot.querySelector('title')?.innerHTML
     document.title = title || 'no page title (pjax)'
 
-    if new_body = @rroot.querySelector('#'+@main_node.id)?.innerHTML
-      @main_node.innerHTML = new_body
-      Pjax.parseScripts()
+    if new_body = @rroot.querySelector('#'+@main_node.id)
+      # this has to be before data insert, because maybe we want to insert some JS that inserted nodes expect to be present
+      # if you need to delay execution of some code untill html is inserted, use this
+      #   window.requestAnimationFrame( ()=>...) )
+      # there should not be problems because image load hack is in place now
+      @main_node.innerHTML = Pjax.parseScripts(new_body)
+
       Pjax.after(@href, @opts)
       Pjax.send_global_event()
 
-      # add history
-      if @opts.replacePath || !@opts.no_history
-        @historyAddCurrent @opts.replacePath || @href
+      @historyAddCurrent(@href)
       true
     else
       false
 
   set_data: ->
     @main_node = Pjax.node()
+
+    if @opts.replacePath
+      @historyAddCurrent(@opts.replacePath)
 
     unless @main_node
       Pjax.error 'template_id mismatch, full page load (use no-pjax as a class name)'
@@ -347,8 +380,8 @@ window.Pjax = class Pjax
         else
           ajax_data = @response
 
-      ajax_node.innerHTML = ajax_data
-      Pjax.parseScripts()
+      ajax_node.innerHTML = Pjax.parseScripts(ajax_data)
+
     else
       @set_title_and_body()
 
