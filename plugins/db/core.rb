@@ -33,7 +33,16 @@ class Sequel::Model
       object
     end
 
-    [:validate, :before_create, :before_save, :after_create, :after_save, :before_destroy, :after_destroy].each do |el|
+    [
+      :validate,
+      :before_create,
+      :before_save,
+      :after_create,
+      :after_save,
+      :before_destroy,
+      :after_destroy,
+      :after_change
+    ].each do |el|
       eval %[
         def #{el} &block
           define_method :#{el} do

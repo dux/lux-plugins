@@ -57,12 +57,15 @@ $.cachedGet = (url, func) ->
 
 # insert script in the head
 $.getScript = (src, check, func) ->
+  if func && typeof check == 'string'
+    check = new Function "return !!window['#{check}']"
+
   unless func
     func = check
     check = null
 
   if check && check()
-     func()
+    func() if func
   else
     script = document.createElement('script')
     script.async  = 'async'

@@ -61,8 +61,13 @@ namespace :db do
 
   desc 'Load seed from ./db/seeds '
   task seed: :app do
+    print "This will destroy all local data and import seeds.\nProceed ? "
+    exit unless $stdin.gets.chomp.downcase == 'y'
+
     all_tables = "SELECT table_name FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog', 'information_schema') and table_type='BASE TABLE' and table_name not in ('spatial_ref_sys')"
-    DB[all_tables].all.map{|el| DB['truncate %s' % el[:table_name]].all }
+    DB[all_tables].all.map{|el| DB['delete from %s' % el[:table_name]].all }
+
+    load_file './db/seeds.rb'
 
     for file in Dir['db/seeds/*'].sort
       puts 'Seed: %s' % file.green

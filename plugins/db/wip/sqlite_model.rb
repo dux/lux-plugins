@@ -6,7 +6,10 @@
 # REMEMBER that you have to migrate schema on db init for sqlite
 
 class SqliteModel
-  cattr :db_conn, class: true
+  DB_CONN    ||= {}
+  DB_SCHEMAS ||= {}
+
+  cattr :db_block
 
   class << self
     def logger target = nil
@@ -16,31 +19,37 @@ class SqliteModel
     end
 
     def db &block
-      if block
-        cattr.db_conn = block
+      if block_given?
+        DB_CONN[to_s] = block
       else
-        cattr.db_conn
+        DB_CONN[self.ancestors[1].to_s].call
       end
     end
 
-    def table name = nil, &block
-      name ||= self.to_s.split('::').last.tableize
-      SequelTable db_conn, name, &block
+    def set_fields *list
+      for el in (list.flatten + [:id])
+        # create static methods from values in schema
+        eval %[
+          #{to_s}.class_eval do
+            def #{el}; @values[:#{el}]; end
+            def #{el}= val; @values[:#{el}] = val; end
+          end
+        ]
+      end
     end
 
-    def inherited klass
-      if klass.db
-        fields = klass.db.schema(table_name(klass)).map(&:first) rescue []
+    def schema &block
+      name ||= self.to_s.split('::').last.tableize
 
-        for el in fields
-          # create static methods from values in schema
-          eval %[
-            #{klass}.class_eval do
-              def #{el}; @values[:#{el}]; end
-              def #{el}= val; @values[:#{el}] = val; end
-            end
-          ]
-        end
+      parent = ancestors[1]
+      parent::DB_SCHEMAS[parent.to_s] ||= {}
+      parent::DB_SCHEMAS[parent.to_s][name] = block
+    end
+
+    def auto_migrate db_conn
+      for table, block in  DB_SCHEMAS[to_s]
+        fields = SequelTable db_conn, table, &block
+        set_fields fields unless respond_to?(fields.first)
       end
     end
 
@@ -60,8 +69,14 @@ class SqliteModel
       new dataset.where(id: id).first
     end
 
-    def last
-      new dataset.order(:id).last
+    def first n = nil
+      list = dataset.order(:id).first(n || 1).all.map{ new _1 }
+      n ? list : list.first
+    end
+
+    def last n = nil
+      list = dataset.order(:id).last(n || 1).all.map{ new _1 }
+      n ? list : list.first
     end
 
     def where *args
@@ -79,14 +94,20 @@ class SqliteModel
 
     def fetch! opts = {}, &block
       out = instance_exec(&block)
-      Paginate out, **opts.merge(klass: self)
+      if out.class == Array
+        out.map { new(_1) }
+      else
+        opts[:size] ||= out.opts[:limit]
+        Paginate out, **opts.merge(klass: self)
+      end
     end
+    alias :map :fetch!
   end
 
   ###
 
   def initialize data = {}
-    @values = (data || {}).to_hwia
+    @values = (data || {})
   end
 
   def validate; end
@@ -134,25 +155,14 @@ class SqliteModel
   alias :attributes :to_h
 end
 
-# def SimpleFeedback
-#   Lux.config[:simple_feedback_sqlite] ||= begin
-#     Sequel.sqlite('./db/sqlite/simple_feedback.sqlite').tap do |db|
-#       db.loggers.push SqliteModel.logger
-
-#       SequelTable db, :feedbacks do
-#         col :name, String
-#         col :email, String
-#       end
-#     end
-#   end
-# end
-
 # class SimpleFeedback < SqliteModel
-#   db { SimpleFeedback() }
-# end
-
-# class SimpleFeedback
+#   db { ...  } # return Sequel conn based on some Thread.current vars
+#
 #   class Feedback < SimpleFeedback
+#    schema do
+#      col :name, String
+#      col :email, String
+#     end
 #   end
 # end
 

@@ -20,7 +20,7 @@ class LuxOauth::Google < LuxOauth
   end
 
   def login
-    "https://accounts.google.com/o/oauth2/auth?client_id=#{@opts.key}&redirect_uri=#{redirect_url}&scope=#{scope.join('%20')}&response_type=code"
+    "https://accounts.google.com/o/oauth2/auth?client_id=#{@opts.key}&redirect_uri=#{Url.escape(redirect_url)}&scope=#{scope.join('%20')}&response_type=code"
   end
 
   def callback session_code

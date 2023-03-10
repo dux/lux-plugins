@@ -33,7 +33,9 @@ class Sequel::Model
           opts[:field] = opts[:method].to_s + '_sid' unless db_schema[opts[:field].to_sym]
         end
 
-        raise NameError.new('Field %s or %s not found for enums %s' % [opts[:field].sub('_sid', '_id'), opts[:field], name]) unless db_schema[opts[:field].to_sym]
+        unless db_schema[opts[:field].to_sym]
+          raise NameError.new('Field %s or %s not found for enums %s' % [opts[:field].sub('_sid', '_id'), opts[:field], name])
+        end
 
         define_method(opts[:field]) do
           self[opts[:field].to_sym].or opts[:default]

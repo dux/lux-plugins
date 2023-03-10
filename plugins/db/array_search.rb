@@ -14,6 +14,7 @@ Sequel::Model.dataset_module do
   #   where("#{table_name}.id in (select unnest(#{table_name.singularize}_ids) from #{target_table})")
   # end
   # assumes field name is tags
+  # Example: Job.where_any(@location.id, :location_ids).count
   def where_any data, field
     return self unless data.present?
 

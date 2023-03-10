@@ -23,7 +23,7 @@
 
 def SequelTable db, table, &block
   st = SequelTable.new db, table
-  st.instance_exec &block
+  st.instance_exec self, &block
   st.summary
 end
 
@@ -97,6 +97,8 @@ class SequelTable
     if unused.first
       info "Unused fileds present in DB -> #{unused.join(', ')}"
     end
+
+    @used_fileds
   end
 
   def info text

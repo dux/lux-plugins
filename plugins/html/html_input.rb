@@ -12,6 +12,8 @@ class HtmlInput
 
     @object = object
     @opts   = opts.dup
+
+    @opts.delete :disabled if @opts[:disabled].to_s == 'false'
   end
 
   def tag *args, &block

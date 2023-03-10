@@ -114,6 +114,8 @@ class HtmlInput
     null  = @opts.delete(:null)
     value = @opts.delete(:value).to_s
 
+    rr collection
+
     body.push %[<label>#{opts.tag(:input)} #{null}</label>] if null
 
     prepare_collection(collection).each do |el|

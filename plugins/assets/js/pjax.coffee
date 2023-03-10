@@ -168,14 +168,13 @@ window.Pjax = class Pjax
 
   @parseSingleScript: (id, img) ->
     img.remove()
-    node = document.getElementById(id)
-    data = node.innerText
-    node.innerText = 1
-    func = new Function data
-    func()
+    if node = document.getElementById(id)
+      func = new Function node.innerText
+      func()
+      node.remove()
 
   # this hack is make inline execution work, like it works in browsers on initial load, seqential
-  # after every script tag, add emppty png that points to script, parse script
+  # after every script tag, add emppty png img that onload points to script, parse script
   @parseScripts: (node) ->
     if typeof node == 'string'
       duplicate = node
@@ -190,8 +189,7 @@ window.Pjax = class Pjax
           if type.indexOf('javascript') > -1
             unless script_tag.id
               @script_cnt ||= 0
-              @script_cnt += 1
-              script_tag.id = "app-sc-#{@script_cnt}"
+              script_tag.id = "app-sc-#{++@script_cnt}"
 
             span = document.createElement "span"
             span.innerHTML = """<img style="display: none;" src="data:image/gif;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==" onload="Pjax.parseSingleScript('#{script_tag.id}', this)" />"""
@@ -423,6 +421,10 @@ PjaxOnClick =
       # if target attribute provided, open in new window
       if /^\w/.test(href) || node.getAttribute('target')
         return window.open(href, node.getAttribute('target') || href.replace(/[^\w]/g, ''))
+
+      # if double slash start
+      if /^\/\//.test(href)
+        return window.open(window.location.origin + href.replace('/', ''), node.getAttribute('target') || href.replace(/[^\w]/g, ''))
 
       # if everything else fails, call Pjax
       Pjax.load href, node: node

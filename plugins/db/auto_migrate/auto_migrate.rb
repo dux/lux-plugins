@@ -197,7 +197,7 @@ module Typero
         was_name = @opts.dig field, :meta, :was
 
         # site_id meta: { was: :org_id }
-        if was_name && !@object[field.to_sym]
+        if was_name && !@object[field.to_sym] && @object[was_name]
           rename was_name, field
           next
         end

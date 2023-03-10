@@ -42,7 +42,8 @@ window.CustomElement =
         .reduce (h, el) ->
           h[el.name] = el.value;
           # if we remove attrs, then we sometimes have to manually re-add them, as for s-ajax, that expects last path attribute to be present at all times
-          node.removeAttribute(el.name)
+          unless ['id', 'svelte'].includes(el.name)
+            node.removeAttribute(el.name)
           h
         , {}
 
@@ -58,6 +59,7 @@ window.CustomElement =
     # node.removeAttribute('onclick')
 
     node.setAttribute('id', id)
+    node.setAttribute('svelte', 'd')
     props ||= {}
     props._id = id
     props
@@ -65,14 +67,25 @@ window.CustomElement =
   # define custom element
   define: (name, func) ->
     if window.customElements
-      window.addEventListener 'DOMContentLoaded', () ->
-        unless customElements.get(name)
-          customElements.define name, class extends HTMLElement
-            attributeChangedCallback: (name, oldValue, newValue) ->
-              console.log('attributeChangedCallback', name, oldValue, newValue)
-            connectedCallback: ->
-              window.requestAnimationFrame =>
-                func @, CustomElement.attributes(@)
+      unless customElements.get(name)
+        customElements.define name, class extends HTMLElement
+          attributeChangedCallback: (name, oldValue, newValue) ->
+            console.log('attributeChangedCallback', name, oldValue, newValue)
+          connectedCallback: ->
+            unless @.getAttribute('svelte') == 'd'
+              if document.readyState == 'complete'
+                window.requestAnimationFrame =>
+                  func @, CustomElement.attributes(@)
+              else
+                # we have to delay node render on chrome, on first request
+                setTimeout =>
+                  func @, CustomElement.attributes(@)
+                , 10
+
+        # we need this to capture elements created before initialization (svelte="p"repared)
+        for el in document.querySelectorAll("""#{name}:not([svelte="d"])""")
+          func el, CustomElement.attributes(el)
+
 
 window.Svelte = (name, func) ->
   if typeof func == 'function'
