@@ -22,19 +22,22 @@ class SqliteModel
       if block_given?
         DB_CONN[to_s] = block
       else
-        DB_CONN[self.ancestors[1].to_s].call
+        klass = self.ancestors[1] == SqliteModel ? self : self.ancestors[1]
+        DB_CONN[klass.to_s].call
       end
     end
 
     def set_fields *list
-      for el in (list.flatten + [:id])
+      for el in ([:id] + list.flatten)
         # create static methods from values in schema
-        eval %[
-          #{to_s}.class_eval do
-            def #{el}; @values[:#{el}]; end
-            def #{el}= val; @values[:#{el}] = val; end
-          end
-        ]
+        unless method_defined?(el)
+          eval %[
+            #{to_s}.class_eval do
+              def #{el}; @values[:#{el}]; end
+              def #{el}= val; @values[:#{el}] = val; end
+            end
+          ]
+        end
       end
     end
 
@@ -49,7 +52,7 @@ class SqliteModel
     def auto_migrate db_conn
       for table, block in  DB_SCHEMAS[to_s]
         fields = SequelTable db_conn, table, &block
-        set_fields fields unless respond_to?(fields.first)
+        set_fields fields
       end
     end
 

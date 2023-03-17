@@ -27,7 +27,7 @@ module HtmlHelper
   extend self
 
   # paginate @list, first: 1
-  def paginate list, in_opts = {}
+  def paginate list, in_opts = {}, &block
     in_opts[:first] ||= '&bull;'
 
     opts = if list.is_a?(Hash)
@@ -44,7 +44,10 @@ module HtmlHelper
       }
     end
 
-    return nil if opts[:page].to_i < 2 && !opts[:next]
+    if opts[:page].to_i < 2 && !opts[:next]
+      # you can add block that will be rendered if no content is found
+      return block && !list[0] ? yield : nil
+    end
 
     ret = ['<div class="paginate"><div>']
 
