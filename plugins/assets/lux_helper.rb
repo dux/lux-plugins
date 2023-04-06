@@ -39,7 +39,7 @@ ApplicationHelper.class_eval do
   # dynamicly generated from controller
   #   = asset '/assets.js', dynamic: true
   def asset name, opts={}
-    if name.include?('//') || opts.delete(:dynamic)
+    if name.include?('//') || name.start_with?('/') || opts.delete(:dynamic)
       asset_tag name, opts
     else
       if name[0,1] == '/'
