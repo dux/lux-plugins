@@ -129,9 +129,10 @@ Svelte.bind = (name, svelte_klass) ->
     svelte_node = new svelte_klass({ target: node, props: { props: opts }})
     node.svelte = svelte_node
 
+    svelte_node.onDomMount?(svelte_node)
+    
     if c = svelte_node.component
       if c.global
-        # export const component = { global: 'Dialog' }
         window[c.global] = svelte_node
 
 # # bind react elements
