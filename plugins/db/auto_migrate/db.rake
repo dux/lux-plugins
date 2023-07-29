@@ -9,7 +9,12 @@ def load_file file, external: false
   info = 'auto_migrate: %s' % file
 
   if !File.exist?(file)
-    info += ' (skipping)'
+    if block_given?
+      yield
+    else
+      info += ' (skipping)'
+    end
+    
     Lux.info info
   elsif external
     Lux.info info
@@ -44,48 +49,17 @@ namespace :db do
 
   desc 'Reset database from db/seed.sql'
   task :reset, [:fast] do |_, args|
-    if args.fast
-      DB.disconnect
-      run "dropdb #{db_name}"
-      run "createdb #{db_name} -T #{db_name}_test"
-    else
-      invoke 'db:drop'
-      invoke 'db:create'
-      invoke 'db:am'
-
-      DB.disconnect
-      run 'rake db:am'
-      run "createdb #{db_name}_test -T #{db_name}"
-    end
-  end
-
-  desc 'Load seed from ./db/seeds '
-  task seed: :app do
-    print "This will destroy all local data and import seeds.\nProceed ? "
-    exit unless $stdin.gets.chomp.downcase == 'y'
-
-    all_tables = "SELECT table_name FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog', 'information_schema') and table_type='BASE TABLE' and table_name not in ('spatial_ref_sys')"
-    DB[all_tables].all.map{|el| DB['delete from %s' % el[:table_name]].all }
-
-    load_file './db/seeds.rb'
-
-    for file in Dir['db/seeds/*'].sort
-      puts 'Seed: %s' % file.green
-      load file
-    end
-  end
-
-  desc 'Create database'
-  task :create do
-    Lux.run "createdb #{db_name}"
-    # Lux.run "createdb #{db_name}_test"
+    invoke 'db:drop'
+    invoke 'db:am'
+    DB.disconnect
+    run 'rake db:am'
   end
 
   desc 'Drop database'
   task :drop do
     DB.disconnect
-    Lux.run "dropdb #{db_name}"
-    Lux.run "dropdb #{db_name}_test"
+    Lux.run "DB_DROP=true lux e 1"
+    DB.disconnect
   end
 
   desc 'Run PSQL console'
@@ -95,13 +69,6 @@ namespace :db do
 
   desc 'Automigrate schema'
   task am: :env do
-    class Object
-      def self.const_missing klass, path=nil
-        eval 'class ::%s; end' % klass,  __FILE__, __LINE__
-        Object.const_get(klass)
-      end
-    end
-
     Lux.config.migrate = true
 
     load '%s/auto_migrate/auto_migrate.rb' % Lux.plugin(:db).folder
@@ -109,7 +76,7 @@ namespace :db do
     # Sequel extension and plugin test
     DB.run %[DROP TABLE IF EXISTS lux_tests;]
     DB.run %[CREATE TABLE lux_tests (int_array integer[] default '{}', text_array text[] default '{}');]
-    class LuxTest < Sequel::Model; end;
+    class LuxTest < Sequel::Model(DB); end;
     LuxTest.new.save
     die('"DB.extension :pg_array" not loaded') unless LuxTest.first.int_array.class == Sequel::Postgres::PGArray
     DB.run %[DROP TABLE IF EXISTS lux_tests;]
@@ -124,5 +91,36 @@ namespace :db do
     end
 
     load_file './db/after.rb', external: true
+  end
+
+  desc 'Load seed from ./db/seeds '
+  task :seed do
+    invoke 'db:reset'
+
+    require './config/app'
+
+    load_file './db/seeds.rb' do
+      for file in Dir['db/seeds/*'].sort
+        puts 'Seed: %s' % file.green
+        load file
+      end
+    end
+  end
+
+  # rake db:gen_seeds[site]
+  # Site.create({
+  #   name: "Main site",
+  #   org_id: @org.id
+  # })
+  desc 'Generate seeds'
+  task :gen_seeds, [:klass] => :env do |_, args|
+    Lux.die 'arguemnt not given => rake db:gen_seeds[model]' unless args[:klass]
+
+    klass = args[:klass].classify.constantize
+    data = klass.limit(100).all.map(&:seed)
+      .join("\n\n")
+      .gsub(/(\w+)_id:\s\d+/) {|el| "#{$1}_id: @#{$1}.id" }
+
+    puts data
   end
 end

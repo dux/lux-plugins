@@ -124,6 +124,8 @@ $.parseScripts = (html) ->
 $.nodesAsList = (root, as_hash) ->
   list = []
 
+  return list unless root
+
   if typeof root == 'string'
     node = document.createElement("div")
     node.innerHTML = root
@@ -325,25 +327,29 @@ $.fn.cancel = ->
     window.event.cancelBubble = true
 
 # searches for parent %ajax node and refreshes with given url
+# node has to have path or ID
+# $(this).ajax('/cell/post/preview/post_id:8/site_id:4/edit:true', '/dashboard/posts/czr/edit:true')
 $.fn.ajax = (path, path_state) ->
   node = if @hasClass('ajax') then @ else @parents('.ajax')
+  id = @attr('id')
 
-  if !node[0] && @attr('id')
+  if node[0]
+    node.attr('data-path', path) if path
+
+    path ||= @attr('path') || @attr('data-path')
     path ||= location.pathname + String(location.search)
+
     $.get path, (data) =>
-      html = $("""<div>#{data}</div>""").find('#'+@attr('id')).html()
-      @html html
+      html = if id
+        $("<div>#{data}</div>").find("##{id}").html() || data
+      else
+       data
 
-  if path
-    node.attr 'path', path
-  else
-    path = node.attr 'path'
+      node.html html
 
-  node.load path
+    # set new path state, so back can work in browsers
+    if path_state
+      if path_state[0] == '?'
+        path_state = location.pathname + path_state
 
-  # set new path state, so back can work in browsers
-  if path_state
-    if path_state[0] == '?'
-      path_state = location.pathname + path_state
-
-    window.history.pushState({ title: document.title }, document.title, path_state)
+      window.history.pushState({ title: document.title }, document.title, path_state)

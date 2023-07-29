@@ -27,7 +27,8 @@ ApplicationHelper.class_eval do
 
   # swelte widget gets props inline
   def svelte name, opts = {}
-    opts.tag('s-%s' % name)
+    opts[:html] = yield.chomp if block_given?
+    {'data-props': opts.to_json}.tag('s-%s' % name)
   end
 
   # public asset from manifest

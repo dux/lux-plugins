@@ -1,7 +1,7 @@
 Sequel::Model.dataset_module do
   # only postgree
   # Bucket.can.all_tags -> all_tags mora biti zadnji
-  def all_tags field=:tags, *args
+  def all_tags field = :tags, *args
     sqlq = sql.split(' FROM ')[1]
     sqlq = "select lower(unnest(#{field})) as tag FROM " + sqlq
     sqlq = "select tag as name, count(tag) as cnt from (#{sqlq}) as tags group by tag order by cnt desc"
@@ -15,13 +15,16 @@ Sequel::Model.dataset_module do
   # end
   # assumes field name is tags
   # Example: Job.where_any(@location.id, :location_ids).count
-  def where_any data, field
-    return self unless data.present?
+  def where_any data, field = :tags
+    if data.present?
+      data = [data] unless data.is_a?(Array)
 
-    if data.is_a?(Array)
-      xwhere data.map { |v| "#{v}=any(#{field})" }.join(' or ')
+      xwhere(data.map do |what|
+        what = what.to_s.gsub(/[^\w\-]+/, '')
+        "'#{what}'=any(#{field})"
+      end.join(' or '))
     else
-      xwhere('?=any(%s)' % field, data)
+      self
     end
   end
 end

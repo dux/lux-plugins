@@ -1,3 +1,5 @@
+# lnk models AR style
+
 module Sequel::Plugins::LuxLinks
   LUX_LINK ||= {}
 

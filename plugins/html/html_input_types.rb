@@ -85,7 +85,7 @@ class HtmlInput
     val = @opts.delete(:value) || ''
     val = val.join($/) if val.is_array?
 
-    App.svelte_tag 's-textarea', {
+    Svelte.tag 's-textarea', {
       name: @opts[:name],
       id: @opts[:id],
       value: val,

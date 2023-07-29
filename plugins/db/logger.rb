@@ -1,6 +1,8 @@
 # Logs DB queries in console
 # to active just load the file
 
+require 'logger'
+
 # error logger to stdout
 Lux.config.sequel_dbs.each do |db|
   logger = Logger.new STDOUT

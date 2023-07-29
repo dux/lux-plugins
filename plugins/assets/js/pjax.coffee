@@ -336,7 +336,6 @@ window.Pjax = class Pjax
       Pjax.after(@href, @opts)
       Pjax.send_global_event()
 
-      @historyAddCurrent(@href)
       true
     else
       false
@@ -344,8 +343,7 @@ window.Pjax = class Pjax
   set_data: ->
     @main_node = Pjax.node()
 
-    if @opts.replacePath
-      @historyAddCurrent(@opts.replacePath)
+    @historyAddCurrent(@opts.replacePath || @href)
 
     unless @main_node
       Pjax.error 'template_id mismatch, full page load (use no-pjax as a class name)'

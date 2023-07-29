@@ -15,15 +15,13 @@
 #   func: (node)=>{ node.innerHTML = 'binded' }
 # })
 # create DOM custom element or polyfil for older browsers
-#
-# Nested nodes - svelte: :inner
-# if you want to have propperly rendered inner nodes that have reactivity, you need this
-#
+
 # %s-toggle-block{ id: 'mail_form' }
 #   .off
-#     %s-info{ svelte: :inner }
+#     %s-info
 #       Email is sent
 #   .on
+# or use server application helper svelte to render innerHTML in params
 
 counter = 1
 
@@ -53,16 +51,44 @@ window.CustomElement =
         .replace(/&gt;/g, '>')
         .replace(/&amp;/g, '&')
 
-      node.innerHTML = ''
-
     # node.removeAttribute('style')
     # node.removeAttribute('onclick')
 
     node.setAttribute('id', id)
-    node.setAttribute('svelte', 'd')
     props ||= {}
     props._id = id
+    props._node = node
+    props.childNodes = (target, nodes) ->
+      nodes ||= Array.from(node.childNodes)
+      
+      if target
+        for el in nodes
+          target.appendChild el
+      else
+        nodes
+
     props
+
+  renderReplace: (node, func) ->
+    # func node, CustomElement.attributes(node)
+
+    attrs = CustomElement.attributes(node)
+    newSpan = document.createElement('span')
+    newSpan.setAttribute('id', node.id)
+    newSpan.setAttribute('class', "custom-element custom-element-#{node.nodeName.toLowerCase()}")
+    node.parentNode?.replaceChild(newSpan, node)
+    func newSpan, attrs
+
+  render: (node, func) ->
+    svelte = node.getAttribute('svelte')
+
+    # console.log node.nodeName
+
+    if document.readyState != 'complete'
+      window.requestAnimationFrame =>
+        @renderReplace node, func
+    else
+      @renderReplace node, func
 
   # define custom element
   define: (name, func) ->
@@ -72,19 +98,11 @@ window.CustomElement =
           attributeChangedCallback: (name, oldValue, newValue) ->
             console.log('attributeChangedCallback', name, oldValue, newValue)
           connectedCallback: ->
-            unless @.getAttribute('svelte') == 'd'
-              if document.readyState == 'complete'
-                window.requestAnimationFrame =>
-                  func @, CustomElement.attributes(@)
-              else
-                # we have to delay node render on chrome, on first request
-                setTimeout =>
-                  func @, CustomElement.attributes(@)
-                , 10
+            CustomElement.render @, func
 
         # we need this to capture elements created before initialization (svelte="p"repared)
         for el in document.querySelectorAll("""#{name}:not([svelte="d"])""")
-          func el, CustomElement.attributes(el)
+          CustomElement.render el, func
 
 
 window.Svelte = (name, func) ->
@@ -106,21 +124,15 @@ window.Svelte = (name, func) ->
   else
     alert('Svelte target DOM node not found')
 
-# bind Svelte elements
-  # bind custom node to class
-
 Svelte.bind = (name, svelte_klass) ->
   CustomElement.define name, (node, opts) ->
     svelte_node = new svelte_klass({ target: node, props: { props: opts }})
     node.svelte = svelte_node
 
-    # export const component = { global: 'Dialog' }
     if c = svelte_node.component
       if c.global
+        # export const component = { global: 'Dialog' }
         window[c.global] = svelte_node
-      for el in (c.preload || [])
-        # <link rel="preload" href="main.js" as="script">
-        alert el
 
 # # bind react elements
 # bind_react: (name, klass) ->

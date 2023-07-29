@@ -1,4 +1,3 @@
-import babel from 'rollup-plugin-babel'
 import svelte from 'rollup-plugin-svelte'
 import { scss } from '@kazzkiq/svelte-preprocess-scss';
 import nodeResolve from 'rollup-plugin-node-resolve'
@@ -29,9 +28,6 @@ class Config {
         coffee({exclude: 'node_modules/**'}),
         nodeResolve({
           browser: true,
-          extensions: extensions
-        }),
-        babel({
           extensions: extensions
         }),
         commonjs({
