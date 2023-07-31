@@ -235,9 +235,14 @@ class HtmlInput
 
   def as_geo
     @opts[:type] = 'text'
-    @opts[:style] = 'width:200px; float:left;'
-    ret = @opts.tag(:input)
-    ret += %[ <a target="new" href="http://maps.google.com/maps?q=loc:#{@opts[:value]}" style="display:block; margin-top:7px;">&nbsp;Show on map</a>]
+    if @opts[:value]
+      @opts[:style] = 'width:200px; float:left; margin-right: 20px;'
+      @opts[:value] = @opts[:value].map(&:to_f).join(', ')
+      ret = @opts.tag(:input)
+      ret += %[ <a target="new" href="http://maps.google.com/maps?q=loc:#{@opts[:value]}" style="display:block; margin-top:7px;">&nbsp;Show on map</a>]
+    else
+      @opts.tag(:input)
+    end
   end
 
   # def as_html

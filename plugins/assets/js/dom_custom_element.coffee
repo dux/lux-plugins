@@ -28,7 +28,6 @@ counter = 1
 window.CustomElement =
   attributes: (node) ->
     props = node.getAttribute('data-props')
-    id = node.getAttribute('id') || "svelte-block-#{counter++}"
 
     if props
       node.removeAttribute('data-props')
@@ -40,30 +39,39 @@ window.CustomElement =
         .reduce (h, el) ->
           h[el.name] = el.value;
           # if we remove attrs, then we sometimes have to manually re-add them, as for s-ajax, that expects last path attribute to be present at all times
-          unless ['id', 'svelte'].includes(el.name)
-            node.removeAttribute(el.name)
+          # unless ['id', 'svelte'].includes(el.name)
+          #   node.removeAttribute(el.name)
           h
         , {}
 
-    if node.innerHTML
-      props.html = node.innerHTML
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&amp;/g, '&')
-
-    # node.removeAttribute('style')
-    # node.removeAttribute('onclick')
-
-    node.setAttribute('id', id)
     props ||= {}
-    props._id = id
-    props._node = node
-    props.childNodes = (target, nodes) ->
+    props.html ||= node.innerHTML
+    id = node.getAttribute('id') || "svelte-block-#{counter++}"
+    node.removeAttribute('id')
+    props.$id = id
+    props.$node = node
+    props.$html = (filter) ->
+      data = String(node.innerHTML)
+      if filter
+        data.replace(/&lt;/g, '<')
+        data.replace(/&gt;/g, '>')
+        data.replace(/&amp;/g, '&')      
+      data
+    
+    # props.$slot(target) - copy all to target
+    # props.$slot(target, nodes) - copy nodes to target
+    # props.$slot('a.link') - get slot clind node links with class name link
+    props.$slot = (target, nodes) ->
       nodes ||= Array.from(node.childNodes)
-      
+
       if target
-        for el in nodes
-          target.appendChild el
+        if typeof target == 'string'
+          return Array.from node.querySelectorAll(target)
+        else
+          nodes = [nodes] if nodes.nodeName
+          for el in nodes
+            target.appendChild el
+        target
       else
         nodes
 
@@ -74,8 +82,9 @@ window.CustomElement =
 
     attrs = CustomElement.attributes(node)
     newSpan = document.createElement('span')
-    newSpan.setAttribute('id', node.id)
+    newSpan.setAttribute('id', attrs.$id)
     newSpan.setAttribute('class', "custom-element custom-element-#{node.nodeName.toLowerCase()}")
+    newSpan.onclick = () -> node.click() if newSpan.onclick
     node.parentNode?.replaceChild(newSpan, node)
     func newSpan, attrs
 
@@ -126,15 +135,11 @@ window.Svelte = (name, func) ->
 
 Svelte.bind = (name, svelte_klass) ->
   CustomElement.define name, (node, opts) ->
-    svelte_node = new svelte_klass({ target: node, props: { props: opts }})
-    node.svelte = svelte_node
-
-    svelte_node.onDomMount?(svelte_node)
+    props = { target: node, props: { props: opts, $$slots: [] }}
+    svelteInstance = new svelte_klass(props)
+    node.svelte = svelteInstance
+    svelteInstance.onDomMount?(svelteInstance, node)
     
-    if c = svelte_node.component
-      if c.global
-        window[c.global] = svelte_node
-
 # # bind react elements
 # bind_react: (name, klass) ->
 #   @define name, (node, opts) ->
