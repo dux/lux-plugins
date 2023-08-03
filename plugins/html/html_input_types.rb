@@ -85,7 +85,7 @@ class HtmlInput
     val = @opts.delete(:value) || ''
     val = val.join($/) if val.is_array?
 
-    Svelte.tag 's-textarea', {
+    Svelte.tag 's-input-textarea', {
       name: @opts[:name],
       id: @opts[:id],
       value: val,
@@ -244,11 +244,6 @@ class HtmlInput
       @opts.tag(:input)
     end
   end
-
-  # def as_html
-  #   # consider http://prosemirror.net
-  #   %[<s-quill-editor name="#{@opts[:name]}">#{@opts[:value].to_s.html_safe}</s-pell>]
-  # end
 
   def as_address
     val = @opts[:value]

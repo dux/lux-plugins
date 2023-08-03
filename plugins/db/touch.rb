@@ -1,3 +1,5 @@
+# this should be done in every projet
+# 
 # module Sequel::Plugins::LuxTouch
 #   module InstanceMethods
 #     # used to touch changed columns, to clear both caches

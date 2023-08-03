@@ -1,3 +1,40 @@
+# loadResource 'https://cdnjs.cloudflare.com/some/min.css'
+# loadResource css: 'https://cdnjs.cloudflare.com/some/min.css'
+loadResource = (src, type) ->
+  if typeof src == 'string'
+    type ||= if src.includes('.css') then 'css' else 'js'
+  else
+    if src = src.css
+      type = 'css'
+    else if src = src.js
+      type = 'js'
+    else if src = src.img
+      type = 'img'
+
+  id = 'res-' + src.replace(/[^\w]+/g, '')
+
+  unless document.getElementById(id)
+    if type == 'css'
+        node = document.createElement('link')
+        node.id = id
+        node.setAttribute 'rel', 'stylesheet'
+        node.setAttribute 'type', 'text/css'
+        node.setAttribute 'href', src
+        document.getElementsByTagName('head')[0].appendChild node
+    else if type == 'js'
+        node = document.createElement('script')
+        node.id    = id
+        node.async = 'async'
+        node.src   = src
+        document.getElementsByTagName('head')[0].appendChild node
+    else if type == 'img'
+        node.id = id
+        node = document.createElement('img')
+        node.src = src
+    else
+      alert "Unsupported type (#{type})"
+
+
 $.delay = (time, func) ->
   if !func
     func = time
@@ -5,11 +42,12 @@ $.delay = (time, func) ->
   setTimeout func, time
 
 # run until function returns true
-$.untilTrue = (func) ->
-  unless func()
-    setTimeout () =>
-      $.untilTrue func
-    , 100
+$.untilTrue = (func, timeout) ->
+  timeout ||= 100
+  unless func() == true
+      setTimeout ->
+        $.untilTrue func, timeout
+      , timeout
 
 # capture key press unless in forms
 $.keyPress = (key, func) ->
@@ -64,14 +102,19 @@ $.getScript = (src, check, func) ->
     func = check
     check = null
 
-  if check && check()
-    func() if func
+  if src.indexOf
+    for el in src
+      loadResource el
   else
-    script = document.createElement('script')
-    script.async  = 'async'
-    script.src    = src
-    script.onload = func if func
-    document.getElementsByTagName('head')[0].appendChild script
+    loadResource src
+
+   if check
+    $.untilTrue =>
+      if check()
+        func()
+        true
+   else if func
+    func()
 
 # insert script module in the head
 # $.loadModule('https://cdn.skypack.dev/easymde', 'EasyMDE', ()=>{

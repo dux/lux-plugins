@@ -59,10 +59,11 @@ window.CustomElement =
       data
     
     # props.$slot(target) - copy all to target
-    # props.$slot(target, nodes) - copy nodes to target
+    # props.$slot(target, nodes) - copy node/nodes to target
     # props.$slot('a.link') - get slot clind node links with class name link
     props.$slot = (target, nodes) ->
       nodes ||= Array.from(node.childNodes)
+      nodes = Array.from node.querySelectorAll(nodes) if typeof nodes == 'string'
 
       if target
         if typeof target == 'string'
@@ -115,30 +116,33 @@ window.CustomElement =
 
 
 window.Svelte = (name, func) ->
-  if typeof func == 'function'
-    # run in scope of svelte blocks
-    Array.prototype.slice
-      .call document.getElementsByTagName(name)
-      .forEach (el) ->
-        func.bind(el.svelte)()
-    return
-
-  target = if func
-    func.closest(name)
-  else
-    document.querySelector(name)
-
-  if target
-    target.svelte || alert('Svelte not bound to DOM node')
-  else
-    alert('Svelte target DOM node not found')
+  if name.nodeName
+    # Svelte(this).close() -> return first parent svelte node
+    while name = name.parentNode
+      return name.name.svelte if name.svelte
+  else 
+    if name[0] == '#'
+      # Svelte('#svelte-block-123').set('spinner')
+      document.querySelectorAll(name)[0]?.svelte
+    else
+      nodes = Array.from document.querySelectorAll(".custom-element-#{name}")
+      
+      if func
+        # Svelte('s-dialog', (el) => { el.close() })
+        nodes.forEach (el) -> func(el.svelte)
+        return
+      else
+        # Svelte('s-dialog') # all dialog nodes
+        return nodes.map((el) => el.svelte)
 
 Svelte.bind = (name, svelte_klass) ->
   CustomElement.define name, (node, opts) ->
-    props = { target: node, props: { props: opts, $$slots: [] }}
-    svelteInstance = new svelte_klass(props)
-    node.svelte = svelteInstance
-    svelteInstance.onDomMount?(svelteInstance, node)
+    # some strange bug with custom nodes double defined, this seems to fix it
+    if node.parentNode
+      props = { target: node, props: { props: opts }}
+      svelteInstance = new svelte_klass(props)
+      node.svelte = svelteInstance
+      svelteInstance.onDomMount?(svelteInstance, node)
     
 # # bind react elements
 # bind_react: (name, klass) ->
