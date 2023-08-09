@@ -1,3 +1,14 @@
+# $.createFunction
+  # const str = "(arg1, arg2) => alert(arg1 + arg2)";
+  # const argsStart = str.indexOf("(");
+  # const argsEnd = str.indexOf(")");
+  # const args = str.substring(argsStart + 1, argsEnd).split(",").map(arg => arg.trim());
+  # const bodyStart = str.indexOf("=>") + 2;
+  # const body = str.substring(bodyStart).trim();
+  # const func = new Function(...args, body);
+  # func(10, 20);
+
+
 # loadResource 'https://cdnjs.cloudflare.com/some/min.css'
 # loadResource css: 'https://cdnjs.cloudflare.com/some/min.css'
 loadResource = (src, type) ->
@@ -34,7 +45,6 @@ loadResource = (src, type) ->
     else
       alert "Unsupported type (#{type})"
 
-
 $.delay = (time, func) ->
   if !func
     func = time
@@ -43,11 +53,21 @@ $.delay = (time, func) ->
 
 # run until function returns true
 $.untilTrue = (func, timeout) ->
-  timeout ||= 100
+  timeout ||= 200
   unless func() == true
       setTimeout ->
         $.untilTrue func, timeout
       , timeout
+
+# run until function returns true and node exists
+$.untilTrueWhileExists = (node, func, timeout) ->
+  $.untilTrue =>
+    if node
+      # console.log(node.checkVisibility(), document.body.contains(node))
+      return true unless document.body.contains(node)
+      if node.checkVisibility()
+        return true if func()
+  , timeout 
 
 # capture key press unless in forms
 $.keyPress = (key, func) ->
@@ -102,7 +122,7 @@ $.getScript = (src, check, func) ->
     func = check
     check = null
 
-  if src.indexOf
+  if src.forEach
     for el in src
       loadResource el
   else

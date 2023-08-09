@@ -52,7 +52,7 @@ module Sequel::Plugins::LuxLinks
             elsif !ids[1]
               [#{klass}.find(ids.first)]
             else
-              #{klass}.where(Sequel.lit('id in ('+ids.join(',')+')')).all
+              #{klass}.where(Sequel.lit('id in ('+ids.join(',')+')')).default.all
             end
           end
         ]

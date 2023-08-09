@@ -23,6 +23,18 @@
 #   .on
 # or use server application helper svelte to render innerHTML in params
 
+$readyAction = (node, func, time) ->
+    # console.log node
+    return unless document.body.contains(node)
+    return if node.checkVisibility() && func() == true
+
+    setTimeout ->
+      $readyAction node, func, time
+    , time || 200
+
+HTMLElement.prototype.$ready = (func, time) ->
+  $readyAction this, func, time
+
 counter = 1
 
 window.CustomElement =
@@ -62,19 +74,23 @@ window.CustomElement =
     # props.$slot(target, nodes) - copy node/nodes to target
     # props.$slot('a.link') - get slot clind node links with class name link
     props.$slot = (target, nodes) ->
-      nodes ||= Array.from(node.childNodes)
-      nodes = Array.from node.querySelectorAll(nodes) if typeof nodes == 'string'
-
       if target
         if typeof target == 'string'
-          return Array.from node.querySelectorAll(target)
+          return Array.from node.querySelectorAll(":scope > #{target}")
         else
-          nodes = [nodes] if nodes.nodeName
+          if nodes?.nodeName
+            nodes = [nodes] 
+          else if typeof nodes == 'string'
+            nodes = Array.from node.querySelectorAll(":scope > #{nodes}") 
+          else
+            nodes = Array.from(node.querySelectorAll(":scope > *"))
+
           for el in nodes
             target.appendChild el
+
         target
       else
-        nodes
+        Array.from(node.querySelectorAll(":scope > *"))
 
     props
 
@@ -119,7 +135,7 @@ window.Svelte = (name, func) ->
   if name.nodeName
     # Svelte(this).close() -> return first parent svelte node
     while name = name.parentNode
-      return name.name.svelte if name.svelte
+      return name.svelte if name.svelte
   else 
     if name[0] == '#'
       # Svelte('#svelte-block-123').set('spinner')
