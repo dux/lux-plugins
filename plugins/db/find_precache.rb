@@ -17,13 +17,15 @@ class Sequel::Model
     def find id
       key = "#{to_s}/#{id}"
 
+      hash = id.is_numeric? ? {id: id} : {ulid: id}
+
       Lux.current.cache key do
         if cattr.cache_ttl
           Lux.cache.fetch(key, ttl: cattr.cache_ttl) do
-            self.first id: id
+            self.first hash
           end
         else
-          self.first id: id
+          self.first hash
         end
       end
     end

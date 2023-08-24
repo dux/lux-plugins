@@ -8,6 +8,24 @@
   # const func = new Function(...args, body);
   # func(10, 20);
 
+# if location.port
+#   window.alert = function(e){ console.warn( "Alerted: " + e ); }
+
+window.Z = $
+
+window.LOG = (what...) =>
+  if location.port
+    # console.warn what
+    what = what[0] if what.length < 2
+    # console.log what.constructor.name
+    if ['Array', 'Object'].includes(what?.constructor.name)
+      console.log(JSON.stringify(what, null, 2))
+    else
+      console.log(what)
+
+window.XMP = (what) =>
+  data = JSON.stringify(what, null, 2)
+  "<xmp style='font-size: 0.9rem; line-height: 1.1rem; padding: 5px; border: 1px solid #ccc; background: #fff;'>#{data}</xmp>"
 
 # loadResource 'https://cdnjs.cloudflare.com/some/min.css'
 # loadResource css: 'https://cdnjs.cloudflare.com/some/min.css'
@@ -22,7 +40,7 @@ loadResource = (src, type) ->
     else if src = src.img
       type = 'img'
 
-  id = 'res-' + src.replace(/[^\w]+/g, '')
+  id = 'res-' + src.replace(/^https?/, '').replace(/[^\w]+/g, '')
 
   unless document.getElementById(id)
     if type == 'css'
@@ -32,11 +50,12 @@ loadResource = (src, type) ->
         node.setAttribute 'type', 'text/css'
         node.setAttribute 'href', src
         document.getElementsByTagName('head')[0].appendChild node
-    else if type == 'js'
+    else if ['js', 'module'].includes(type)
         node = document.createElement('script')
         node.id    = id
         node.async = 'async'
         node.src   = src
+        node.type = 'module' if type == 'module'
         document.getElementsByTagName('head')[0].appendChild node
     else if type == 'img'
         node.id = id
@@ -44,6 +63,55 @@ loadResource = (src, type) ->
         node.src = src
     else
       alert "Unsupported type (#{type})"
+
+#
+
+$.tag = (nodeName, attrs) ->
+  attrStr = Object.keys(attrs)
+    .filter (key) -> attrs[key] != undefined
+    .map (key) -> "#{key}='#{attrs[key]}'"
+    .join(' ')
+
+  if ['img', 'input', 'link', 'meta'].includes(nodeName)
+    "<#{nodeName} #{attrStr} />"
+  else
+    "<#{nodeName} #{attrStr}></#{nodeName}>"
+
+$.slice = (object, ...args) ->
+  out = {}
+  for key in args
+    out[key] = object[key]
+  out
+
+$.eval = (...args) ->
+  if str = args.shift()
+    # str = "()=>{render(#{str})}" unless str[0] == '('
+    # params = str.match(/\((.*?)\)/)[1]
+    # alert params
+    func = if typeof str == 'string' then eval "(#{str})" else str
+    func(args...)
+
+$.fnv1 = (str) ->
+  FNV_OFFSET_BASIS = 2166136261
+  FNV_PRIME = 16777619
+  
+  hash = FNV_OFFSET_BASIS
+
+  for i in [0..str.length - 1]
+    hash ^= str.charCodeAt(i)
+    hash *= FNV_PRIME
+
+  # Convert the hash to base 36
+  hash.toString(36).replaceAll('-', '')
+
+ulidCounter = 0
+$.ulid = ->
+  parts = [
+    (new Date()).getTime(),
+    String(Math.random()).replace('0.', ''),
+    ++ulidCounter
+  ]
+  BigInt(parts.join('')).toString(36).slice(0, 20)
 
 $.delay = (time, func) ->
   if !func
@@ -140,7 +208,7 @@ $.getScript = (src, check, func) ->
 # $.loadModule('https://cdn.skypack.dev/easymde', 'EasyMDE', ()=>{
 #   let editor = new EasyMDE({
 $.loadModule = (src, import_gobal, on_load) ->
-  module_id = 'header_module_' + import_gobal
+  module_id = "header_module_#{$.fnv1(src)}"
   on_load ||= () => true
 
   unless document.getElementById(module_id)
@@ -181,7 +249,6 @@ $.parseScripts = (html) ->
 
 
   tmp.innerHTML
-
 
 # return child nodes as list of hashes
 $.nodesAsList = (root, as_hash) ->
@@ -312,6 +379,7 @@ $.fn.slideUp = (duration) ->
       display: 'none'
       height: ''
 
+# $('form#foo').serializeHash()
 $.fn.serializeHash = ->
   hash = {}
 
@@ -416,3 +484,23 @@ $.fn.ajax = (path, path_state) ->
         path_state = location.pathname + path_state
 
       window.history.pushState({ title: document.title }, document.title, path_state)
+
+$.fn.shake = (interval = 150) ->
+  @addClass 'shaking'
+  @css 'transition', "all 0.#{interval}s"
+  setTimeout (=>@css('transform', 'rotate(-10deg)')), interval * 0
+  setTimeout (=>@css('transform', 'rotate(10deg)')), interval * 1
+  setTimeout (=>@css('transform', 'rotate(-5deg)')), interval * 2
+  setTimeout (=>@css('transform', 'rotate(5deg)')), interval * 3
+  setTimeout (=>@css('transform', 'rotate(-2deg)')), interval * 4
+  setTimeout (=>@css('transform', 'rotate(0deg)')), interval * 5
+  @removeClass 'shaking'
+
+$.fn.isVisible = () -> @[0] && @[0].checkVisibility()
+$.scrollToBottom = (goNow) -> 
+  if goNow == true
+    window.scrollTo(0, document.body.scrollHeight)
+  else
+    setTimeout () =>
+      window.scrollTo(0, document.body.scrollHeight)
+    , goNow || 200

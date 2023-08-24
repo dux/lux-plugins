@@ -23,28 +23,72 @@
 #   .on
 # or use server application helper svelte to render innerHTML in params
 
-$readyAction = (node, func, time) ->
-    # console.log node
-    return unless document.body.contains(node)
-    return if node.checkVisibility() && func() == true
-
-    setTimeout ->
-      $readyAction node, func, time
-    , time || 200
+# function will loop while node exists in document, run if is visible and will stop on return true
+# if you need just a small delay, use window.requestAnimationFrame instead (much faster and no flicker)
 
 HTMLElement.prototype.$ready = (func, time) ->
-  $readyAction this, func, time
+  interval = setInterval () =>
+    # LOG this.checkVisibility() 
+    return clearInterval interval unless document.body.contains(this)
+    if this.checkVisibility()
+      clearInterval interval
+      func()
+
+  , time || 300
+
+nodesAsList = (root, as_hash) ->
+  list = []
+
+  return list unless root
+
+  if typeof root == 'string'
+    node = document.createElement("div")
+    node.innerHTML = root
+    root = node
+
+  root.childNodes.forEach (node, i) ->
+    if node.attributes
+      o = {}
+      o.NODE = node
+      o.NODENAME = node.nodeName
+      o.ID = i + 1
+      o.html = node.innerHTML
+
+      for a in node.attributes
+        o[a.name] = a.value
+
+      list.push o
+
+  if as_hash
+    out = {}
+    for el in list
+      out[el.NODENAME] ||= []
+      out[el.NODENAME].push el
+    out
+  else
+    list
+
+
 
 counter = 1
 
 window.CustomElement =
   attributes: (node) ->
-    props = node.getAttribute('data-props')
+    props = {}
 
-    if props
-      node.removeAttribute('data-props')
+    if props = node.getAttribute('data-props')
       # if you want to send nested complex data, best to define as data-props encoded as JSON
+      # LOG props.replaceAll('"', 'x').split('Segoe UI', 2)[1]
       props = JSON.parse(props)
+    else if template_id = node.getAttribute('data-json-template')
+      # BEST 
+      # template{ id: foo}= @object.to_jsonp
+      data = document.getElementById(template_id).value
+      props = if data then JSON.parse(data) else {}
+    else if base64_data = node.getAttribute('data-props-base64')
+      # UTF8 problems
+      data = atob(base64_data)
+      props = JSON.parse(data)
     else
       props = Array.prototype.slice
         .call(node.attributes)
@@ -62,6 +106,8 @@ window.CustomElement =
     node.removeAttribute('id')
     props.$id = id
     props.$node = node
+    props.$nodes = () => nodesAsList(node)
+    props.$self = "Svelte('##{id}')"
     props.$html = (filter) ->
       data = String(node.innerHTML)
       if filter
@@ -151,7 +197,9 @@ window.Svelte = (name, func) ->
         # Svelte('s-dialog') # all dialog nodes
         return nodes.map((el) => el.svelte)
 
+Svelte.index = {}
 Svelte.bind = (name, svelte_klass) ->
+  Svelte.index[name] = svelte_klass
   CustomElement.define name, (node, opts) ->
     # some strange bug with custom nodes double defined, this seems to fix it
     if node.parentNode
@@ -159,6 +207,27 @@ Svelte.bind = (name, svelte_klass) ->
       svelteInstance = new svelte_klass(props)
       node.svelte = svelteInstance
       svelteInstance.onDomMount?(svelteInstance, node)
+
+# you pass base props and default values, get filterd hash (button-tabs for details)
+# let props = Svelte.props($$props, { name: null, size: 24 })
+Svelte.props = (base, obj) =>
+  out = {}
+  props = base.props || {}
+
+  if obj == undefined
+    obj = {}
+    Object.keys(base.props || base).map (key) => obj[key] = null
+
+  keys = Object.keys(obj).concat(['$id', '$node', '$nodes', '$self'])
+  keys.forEach (key) =>
+    vals = [props[key], base[key], obj[key]]
+    out[key] = vals.find((v) => v != undefined)
+
+  # you need to pass dom node after mount if useing native and not custom DOM nodes render
+  # function mount (node) { links = props.links || props.$nodes(node); ... }
+  out.$nodes ||= nodesAsList
+
+  out
     
 # # bind react elements
 # bind_react: (name, klass) ->

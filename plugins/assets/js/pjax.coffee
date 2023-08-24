@@ -313,7 +313,7 @@ window.Pjax = class Pjax
 
   # add current page to history
   historyAddCurrent: (href) ->
-    return if @opts.no_history
+    return if @opts.no_history || @opts.ajax_node
     return if @history_added; @history_added = true
 
     if Pjax.lastHref == href

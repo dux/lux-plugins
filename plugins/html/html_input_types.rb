@@ -90,10 +90,16 @@ class HtmlInput
       id: @opts[:id],
       value: val,
       class: @opts[:class],
-      style: @opts[:style]
+      style: @opts[:style],
+      max: @opts[:max],
+      wrap: @opts[:wrap]
     }
   end
-  alias :as_memo :as_textarea
+  
+  def as_memo
+    @opts[:wrap] = 'wrap'
+    as_textarea
+  end
 
   def as_checkbox
     @opts.delete(:value) if ['0', 'false', 'off'].include?(@opts[:value].to_s)

@@ -27,8 +27,10 @@ ApplicationHelper.class_eval do
 
   # swelte widget gets props inline
   def svelte name, opts = {}
-    opts[:html] = yield.chomp if block_given?
-    {'data-props': opts.to_json}.tag('s-%s' % name)
+    id = Lux.current.uid
+    opts[:html] = "#{yield}".chomp if block_given?
+    tag = {'data-json-template': id }.tag('s-%s' % name)
+    %[<textarea id="#{id}" style="display:none">#{opts.to_jsonp}</textarea>#{tag}]
   end
 
   # public asset from manifest
