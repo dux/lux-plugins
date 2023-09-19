@@ -68,8 +68,6 @@ nodesAsList = (root, as_hash) ->
   else
     list
 
-
-
 counter = 1
 
 window.CustomElement =

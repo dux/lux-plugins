@@ -313,14 +313,17 @@ window.Pjax = class Pjax
 
   # add current page to history
   historyAddCurrent: (href) ->
+    Pjax.lastHref = href
+
     return if @opts.no_history || @opts.ajax_node
     return if @history_added; @history_added = true
 
-    if Pjax.lastHref == href
+    if Pjax._lastHrefCheck == href
       window.history.replaceState({}, document.title, href);
     else
       window.history.pushState({}, document.title, href)
-      Pjax.lastHref = href
+      Pjax._lastHrefCheck = href
+      
 
   set_title_and_body: ->
     title = @rroot.querySelector('title')?.innerHTML
@@ -359,27 +362,11 @@ window.Pjax = class Pjax
     if ajax_node = @opts.ajax_node
       ajax_node.setAttribute('data-path', @href)
       ajax_node.removeAttribute('path')
-
-      ajax_data = if ajax_id = ajax_node.getAttribute('id')
-        @rroot.querySelector('#'+ajax_id)?[0]
-      else
-        @rroot.querySelector(Pjax.config.ajax_selector)?[0]
-
-      if ajax_data
-        ajax_data = ajax_data.innerHTML
-      else
-        if @response.includes('<html') && @response.includes('<body')
-          # this happens when you have parent .ajax node, click link, and full page is loaded
-          # without ajax node + ID match. we assume it is full fresh page and reload all
-          # to mitigate that behaviour without ID match, just send partial without <html tag
-          return @set_title_and_body()
-        else
-          ajax_data = @response
-
-      ajax_node.innerHTML = Pjax.parseScripts(ajax_data)
-
+      ajax_id = ajax_node.getAttribute('id') || alert('Pjax .ajax node has no ID')
+      ajax_data = @rroot.querySelector('#'+ajax_id)?.innerHTML || @response
+      ajax_node.innerHTML = Pjax.parseScripts(ajax_data) 
     else
-      @set_title_and_body()
+      @set_title_and_body() # is all works well, add code here
 
 # handle back button gracefully
 window.onpopstate = (event) ->
@@ -394,6 +381,10 @@ PjaxOnClick =
       event.preventDefault()
 
       href = node.getAttribute 'href'
+
+      if href.slice(0, 2) == '//'
+        href = href.replace '/', ''
+        return window.open href
 
       # if ctrl or cmd button is pressed, open in new window
       if event.which == 2 || event.metaKey

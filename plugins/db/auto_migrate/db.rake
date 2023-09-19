@@ -43,7 +43,7 @@ namespace :db do
     sql_file = db_backup_file_location args
 
     invoke 'db:drop'
-    invoke 'db:create'
+    # invoke 'db:create'
     Lux.run 'psql %s < %s' % [db_name, sql_file]
   end
 
@@ -61,6 +61,11 @@ namespace :db do
     Lux.run "DB_DROP=true lux e 1"
     DB.disconnect
   end
+
+  # desc 'Create datebase'
+  # task :create do
+
+  # end
 
   desc 'Run PSQL console'
   task :console do

@@ -27,6 +27,14 @@ window.XMP = (what) =>
   data = JSON.stringify(what, null, 2)
   "<xmp style='font-size: 0.9rem; line-height: 1.1rem; padding: 5px; border: 1px solid #ccc; background: #fff;'>#{data}</xmp>"
 
+window.xalert = (message) ->
+  try
+    throw new Error(message)
+  catch e
+    stackLines = e.stack.split('\n')
+    callerLine = stackLines[2] # Adjust the index as needed based on your project's call stack structure
+    alert "#{callerLine.trim()}\n\n#{message}"
+
 # loadResource 'https://cdnjs.cloudflare.com/some/min.css'
 # loadResource css: 'https://cdnjs.cloudflare.com/some/min.css'
 loadResource = (src, type) ->
@@ -76,12 +84,6 @@ $.tag = (nodeName, attrs) ->
     "<#{nodeName} #{attrStr} />"
   else
     "<#{nodeName} #{attrStr}></#{nodeName}>"
-
-$.slice = (object, ...args) ->
-  out = {}
-  for key in args
-    out[key] = object[key]
-  out
 
 $.eval = (...args) ->
   if str = args.shift()
@@ -203,7 +205,7 @@ $.getScript = (src, check, func) ->
         true
    else if func
     func()
-
+  
 # insert script module in the head
 # $.loadModule('https://cdn.skypack.dev/easymde', 'EasyMDE', ()=>{
 #   let editor = new EasyMDE({
@@ -356,13 +358,6 @@ $.fn.xhtml = (data) ->
 
     this.innerHTML = data
 
-# get or set unique ID on a node
-$.fn.node_id = ->
-  unless window._node_id_cnt
-    window._node_id_cnt = 0
-  unless @attr('id')
-    @attr 'id', 'jsapp_uid_' + ++window._node_id_cnt
-  @attr 'id'
 
 $.fn.slideDown = (duration) ->
   @show()
@@ -497,6 +492,7 @@ $.fn.shake = (interval = 150) ->
   @removeClass 'shaking'
 
 $.fn.isVisible = () -> @[0] && @[0].checkVisibility()
+
 $.scrollToBottom = (goNow) -> 
   if goNow == true
     window.scrollTo(0, document.body.scrollHeight)
@@ -504,3 +500,42 @@ $.scrollToBottom = (goNow) ->
     setTimeout () =>
       window.scrollTo(0, document.body.scrollHeight)
     , goNow || 200
+
+$.showLoader = () ->
+  data = """<div id="loader-bar">
+    <style>
+      .loader-bar {
+        position: fixed;
+        top: 0px;
+        left: 0px;
+        width: 0px;
+        height: 10px;
+        background-color: #ccc;
+        animation: loader-bar-fill 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+      }
+
+      @keyframes loader-bar-fill {
+        0% {
+          width: 0;
+        }
+        60% {
+          width: 50%;
+        }
+        100% {
+          width: 100%;
+        }
+      }
+    </style>
+    <div class="loader-bar"></div>
+  </div>"""
+
+  $(document.body).append(data)
+  $.delay(500, () => $('#loader-bar').remove() )
+
+Z.simpleEncode = (str) -> # base64 then rot13
+  btoa(str)
+    .replace /[a-zA-Z]/g, (c) ->
+      charCode = c.charCodeAt(0)
+      baseCharCode = if c >= 'a' then 'a'.charCodeAt(0) else 'A'.charCodeAt(0)
+      String.fromCharCode(baseCharCode + ((charCode - baseCharCode + 13) % 26))
+    .replaceAll('/', '_').replace(/=+$/, '')
