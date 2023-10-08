@@ -27,10 +27,9 @@ ApplicationHelper.class_eval do
 
   # swelte widget gets props inline
   def svelte name, opts = {}
-    id = Lux.current.uid
     opts[:html] = "#{yield}".chomp if block_given?
-    tag = {'data-json-template': id }.tag('s-%s' % name)
-    %[<textarea id="#{id}" style="display:none">#{opts.to_jsonp}</textarea>#{tag}]
+    tag = {'data-json-template': true }.tag('s-%s' % name)
+    %[<textarea style="display:none">#{opts.to_jsonp}</textarea>#{tag}]
   end
 
   # public asset from manifest
@@ -56,7 +55,7 @@ ApplicationHelper.class_eval do
           @json ||= JSON.load File.read('./public/manifestx.json')
           # cloudflare changes files on the fly and fcks up integrity check, have to disable
           # opts[:integrity] = @json['integrity'][name]
-          file = @json['files'][name] || die('Asset error: File "%s" not found' % name)
+          file = @json['files'][name] || die('Asset error: File "%s" not found in manifest' % name)
           '/assets/%s' % file
         end
       end

@@ -31,7 +31,7 @@ plainObject = (data) =>
     o
   @compact = (func) =>
     out = {}
-    @map (k, v) => out[k] = v if !k.includes('$') && ![undefined, null, ''].includes(v) && k == k.toLowerCase()
+    @map (k, v) => out[k] = v if !k.includes('$') && ![undefined, null, 'undefined', ''].includes(v) && k == k.toLowerCase()
     out
   @Compact = (...args) ->
     O @compact(...args)
@@ -59,7 +59,7 @@ plainObject = (data) =>
 arrayObject = (data) =>
   @data = data
   @notNil = => @data.filter((el) => ![null, undefined].includes(el))
-  @compact = => @data.filter((el) => el)
+  @compact = => @data.filter((el) => ![null, undefined, 'undefined', ''].includes(el))
   @prev = (el) ->
     i = @data.indexOf(el)
     if i > 0 then @data[i - 1] else null

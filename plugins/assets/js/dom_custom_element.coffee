@@ -78,15 +78,11 @@ window.CustomElement =
       # if you want to send nested complex data, best to define as data-props encoded as JSON
       # LOG props.replaceAll('"', 'x').split('Segoe UI', 2)[1]
       props = JSON.parse(props)
-    else if template_id = node.getAttribute('data-json-template')
+    else if node.getAttribute('data-json-template')
       # BEST 
       # template{ id: foo}= @object.to_jsonp
-      data = document.getElementById(template_id).value
+      data = node.previousSibling?.value
       props = if data then JSON.parse(data) else {}
-    else if base64_data = node.getAttribute('data-props-base64')
-      # UTF8 problems
-      data = atob(base64_data)
-      props = JSON.parse(data)
     else
       props = Array.prototype.slice
         .call(node.attributes)
@@ -150,11 +146,8 @@ window.CustomElement =
     func newSpan, attrs
 
   render: (node, func) ->
-    svelte = node.getAttribute('svelte')
-
-    # console.log node.nodeName
-
     if document.readyState != 'complete'
+      # ['complete', 'loaded', 'interactive'].includes(document.readyState)
       window.requestAnimationFrame =>
         @renderReplace node, func
     else
@@ -169,11 +162,6 @@ window.CustomElement =
             console.log('attributeChangedCallback', name, oldValue, newValue)
           connectedCallback: ->
             CustomElement.render @, func
-
-        # we need this to capture elements created before initialization (svelte="p"repared)
-        for el in document.querySelectorAll("""#{name}:not([svelte="d"])""")
-          CustomElement.render el, func
-
 
 window.Svelte = (name, func) ->
   if name.nodeName

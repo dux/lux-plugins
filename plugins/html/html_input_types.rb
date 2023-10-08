@@ -92,7 +92,8 @@ class HtmlInput
       class: @opts[:class],
       style: @opts[:style],
       max: @opts[:max],
-      wrap: @opts[:wrap]
+      wrap: @opts[:wrap],
+      placeholder: @opts[:placeholder],
     }
   end
   

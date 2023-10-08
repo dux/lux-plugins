@@ -7,7 +7,7 @@ namespace :assets do
   task :compile do
     Lux.run 'rm -rf public/assets'
     Lux.run 'bundle exec lux cerb'
-    Lux.run 'rollup -c --compact' # --context window
+    Lux.run 'npx rollup -c --compact' # --context window
 
     for css in Dir.files('app/assets').select { |it| it.ends_with?('.css') || it.ends_with?('.scss') }
       Lux.run "npx node-sass app/assets/#{css} -o public/assets/ --output-style compressed"
@@ -32,7 +32,39 @@ namespace :assets do
     manifest.write JSON.pretty_generate(json)
 
     Lux.run "gzip -9 -k public/assets/*.*"
-    Lux.run 'ls -lSrh public/assets | grep .gz --color=never'
+    # Lux.run 'ls -lSrh public/assets'
+
+    totals = {}
+    Dir['public/assets/*'].each do |file|
+      size = File.size(file)
+      
+      if file.include?('.gz')
+        root = totals[:zip] ||= {}
+        if file.include?('.css')
+          root[:css] ||= 0
+          root[:css] += size
+        elsif file.include?('.js')
+          root[:js] ||= 0
+          root[:js] += size
+        end
+      else
+        root = totals[:raw] ||= {}
+        if file.include?('.css')
+          root[:css] ||= 0
+          root[:css] += size
+        elsif file.include?('.js')
+          root[:js] ||= 0
+          root[:js] += size
+        end
+      end
+    end
+    
+    puts 'Assets totals:'
+    totals.each do |kind, type|
+      type.each do |ext, size|
+        puts "  #{kind} #{ext.to_s.ljust(3)}: #{size.to_filesize}"
+      end
+    end
   end
 
   desc 'Install example rollup.config.js, package.json and Procfile'

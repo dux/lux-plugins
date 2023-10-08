@@ -72,6 +72,7 @@ window.Pjax = class Pjax
   @refresh: (func, opts) ->
     opts = @getOpts func, opts
     opts.no_scroll = true
+    opts.no_cache = true
     @fetch(opts)
 
   # reload, jump to top, no_cache http request forced
@@ -111,7 +112,7 @@ window.Pjax = class Pjax
       if ajax_node
         opts.ajax_node = ajax_node
         opts.no_scroll = true unless opts.no_scroll?
-
+   
     if opts.path[0] == '?'
       # if href starts with ?
       if opts.ajax_node
