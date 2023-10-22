@@ -29,7 +29,7 @@ ApplicationHelper.class_eval do
   def svelte name, opts = {}
     opts[:html] = "#{yield}".chomp if block_given?
     tag = {'data-json-template': true }.tag('s-%s' % name)
-    %[<textarea style="display:none">#{opts.to_jsonp}</textarea>#{tag}]
+    %[<textarea style="display:none">#{opts.to_jsonp.html_safe}</textarea>#{tag}]
   end
 
   # public asset from manifest

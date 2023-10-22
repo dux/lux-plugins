@@ -12,6 +12,12 @@
 #   window.alert = function(e){ console.warn( "Alerted: " + e ); }
 
 window.Z = $
+window.ZZ = (nodeId) => 
+  if typeof nodeId == 'string'
+    nodeId = '#' + nodeId unless nodeId.includes('#')
+    Z(nodeId)
+  else
+    nodeId
 
 window.LOG = (what...) =>
   if location.port
@@ -74,6 +80,9 @@ loadResource = (src, type) ->
 
 #
 
+$.capitalize = (str) ->
+  str.charAt(0).toUpperCase() + str.slice(1)
+
 $.tag = (nodeName, attrs) ->
   attrStr = Object.keys(attrs)
     .filter (key) -> attrs[key] != undefined
@@ -106,6 +115,9 @@ $.fnv1 = (str) ->
   # Convert the hash to base 36
   hash.toString(36).replaceAll('-', '')
 
+$.htmlSafe = (text) =>
+  String(text).replaceAll('#LT;', '<').replaceAll('<script', '&lt;script')
+
 ulidCounter = 0
 $.ulid = ->
   parts = [
@@ -122,7 +134,19 @@ $.delay = (time, func) ->
   setTimeout func, time
 
 # run until function returns true
-$.untilTrue = (func, timeout) ->
+# $.untilTrue('md5', () => { md5(key) })
+# $.untilTrue(() => { if (window.md5) { md5(key); return true}})
+$.untilTrue = (args...) ->
+  if typeof args[0] == 'string'
+    func = () -> 
+      if window[args[0]]
+        args[1]()
+        return true
+    timeout = args[2]
+  else
+    func = args[0]
+    timeout = args[1]
+
   timeout ||= 200
   unless func() == true
       setTimeout ->
@@ -171,6 +195,25 @@ $.debounce = (uid, delay, callback) ->
     clearTimeout $._debounce_hash[uid]
 
   $._debounce_hash[uid] = setTimeout(callback, delay)
+
+$._throttle_hash = {}
+$.throttle = (uid, delay, callback) ->
+  if typeof delay == 'function'
+    callback = delay
+    delay = 200
+
+  $._throttle_hash[uid] ||= [0]
+
+  doIt = () -> 
+    $._throttle_hash[uid][0] = new Date()
+    callback()
+
+  diff = new Date() - $._throttle_hash[uid][0]
+  if diff > delay
+    doIt()
+  else
+    clearTimeout $._throttle_hash[uid][1]
+    $._throttle_hash[uid][1] = setTimeout(doIt, delay)
 
 # for ajax search, will cache results
 $._cached_get = {}
@@ -340,6 +383,60 @@ $.resizeIframe = (obj) ->
 $.d = (obj) ->
   JSON.stringify obj, null, 2
 
+$.simpleEncode = (str) -> # base64 then rot13
+  btoa(str)
+    .replace /[a-zA-Z]/g, (c) ->
+      charCode = c.charCodeAt(0)
+      baseCharCode = if c >= 'a' then 'a'.charCodeAt(0) else 'A'.charCodeAt(0)
+      String.fromCharCode(baseCharCode + ((charCode - baseCharCode + 13) % 26))
+    .replaceAll('/', '_').replace(/=+$/, '')
+
+$._setInterval = {}
+$.setInterval = (name, func, every) ->
+  clearInterval $._setInterval[name]
+  $._setInterval[name] = setInterval func, every
+
+$.scrollToBottom = (goNow) -> 
+  if goNow == true
+    window.scrollTo(0, document.body.scrollHeight)
+  else
+    setTimeout () =>
+      window.scrollTo(0, document.body.scrollHeight)
+    , goNow || 200
+
+$.saveInfo = () ->
+  data = """<div id="loader-bar">
+    <style>
+      .loader-bar {
+        position: fixed;
+        top: 0px;
+        left: 0px;
+        width: 0px;
+        height: 3px;
+        background-color: #8198cd;
+        animation: loader-bar-fill 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+      }
+
+      @keyframes loader-bar-fill {
+        0% {
+          width: 0;
+        }
+        60% {
+          width: 50%;
+        }
+        100% {
+          width: 100%;
+        }
+      }
+    </style>
+    <div class="loader-bar"></div>
+  </div>"""
+
+  $(document.body).append(data)
+  $.delay(500, () => $('#loader-bar').remove() )
+
+# node functions
+
 # add html but do not everwrite ids
 $.fn.xhtml = (data) ->
   id = $(@).attr('id')
@@ -385,6 +482,20 @@ $.fn.serializeHash = ->
       hash[@name] = val
 
   hash
+
+# $('form#foo').ajaxSubmit((response) { ... })
+$.fn.ajaxSubmit = (callback)->
+  form = $(this)
+  $.ajax
+    type: (form.attr('method') || 'get').toUpperCase()
+    url: form.attr 'action'
+    data: form.serializeHash() 
+    headers:
+      'x-tz-name': Intl.DateTimeFormat().resolvedOptions().timeZone if window.Intl
+    complete: (r) =>
+      data = r.responseText
+      data = JSON.parse(data) if r.getResponseHeader('content-type').toLowerCase().includes('json')
+      callback(data, r) if callback
 
 # execute func if first element found
 $.fn.xfirst = (func) ->
@@ -492,50 +603,3 @@ $.fn.shake = (interval = 150) ->
   @removeClass 'shaking'
 
 $.fn.isVisible = () -> @[0] && @[0].checkVisibility()
-
-$.scrollToBottom = (goNow) -> 
-  if goNow == true
-    window.scrollTo(0, document.body.scrollHeight)
-  else
-    setTimeout () =>
-      window.scrollTo(0, document.body.scrollHeight)
-    , goNow || 200
-
-$.showLoader = () ->
-  data = """<div id="loader-bar">
-    <style>
-      .loader-bar {
-        position: fixed;
-        top: 0px;
-        left: 0px;
-        width: 0px;
-        height: 10px;
-        background-color: #ccc;
-        animation: loader-bar-fill 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards;
-      }
-
-      @keyframes loader-bar-fill {
-        0% {
-          width: 0;
-        }
-        60% {
-          width: 50%;
-        }
-        100% {
-          width: 100%;
-        }
-      }
-    </style>
-    <div class="loader-bar"></div>
-  </div>"""
-
-  $(document.body).append(data)
-  $.delay(500, () => $('#loader-bar').remove() )
-
-Z.simpleEncode = (str) -> # base64 then rot13
-  btoa(str)
-    .replace /[a-zA-Z]/g, (c) ->
-      charCode = c.charCodeAt(0)
-      baseCharCode = if c >= 'a' then 'a'.charCodeAt(0) else 'A'.charCodeAt(0)
-      String.fromCharCode(baseCharCode + ((charCode - baseCharCode + 13) % 26))
-    .replaceAll('/', '_').replace(/=+$/, '')

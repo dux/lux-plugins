@@ -1,3 +1,6 @@
+# TRY to create unified interface to SQLITE, but switch file name based on some param
+#   why: for example keep all site data in a single sqlite file, every new site is a new file
+#   state: feels hacky and I do not like it
 # # how?
 # # * creates parent class that gets dataset from Thread.current
 # # * recreate all important Sequel class methods
@@ -159,12 +162,25 @@ class SqliteModel
 end
 
 # class SimpleFeedback < SqliteModel
-#   db { ...  } # return Sequel conn based on some Thread.current vars
-#
+#   db do
+#     @db ||= begin
+#       path = './sqlite/simple_feedback.sqlite'
+#       Sequel.sqlite(path).tap do |c|
+#         auto_migrate c
+#         c.loggers.push SqliteModel.logger if Lux.env.local?
+#       end
+#     end
+#   end
+
 #   class Feedback < SimpleFeedback
-#    schema do
-#      col :name, String
-#      col :email, String
+#     schema do
+#       col :name, String   # base to show something
+#       col :data, String   # all other json data
+#       col :url, String    # Current page URL
+#       col :group, String  # group (site or 'admin')
+#       col :kind, String   # suggestion, bug, ...
+#       col :email, String  # user email
+#       col :created_at, Time
 #     end
 #   end
 # end

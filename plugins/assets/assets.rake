@@ -59,7 +59,7 @@ namespace :assets do
       end
     end
     
-    puts 'Assets totals:'
+    puts 'Assets (photos) totals:'
     totals.each do |kind, type|
       type.each do |ext, size|
         puts "  #{kind} #{ext.to_s.ljust(3)}: #{size.to_filesize}"

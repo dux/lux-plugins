@@ -24,7 +24,7 @@ class LuxOauth::Stackexchange < LuxOauth
       code:          session_code
     }, { :accept => :json })
 
-    access_token = result.to_s.css_to_hash['access_token']
+    access_token = result.to_s.qs_to_hash['access_token']
 
     response = RestClient.get('https://api.stackexchange.com/2.2/me', {
       accept: :json,

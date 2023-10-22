@@ -35,3 +35,10 @@ for i in [0..(MediaBodyClass.sizes.length - 2)]
 
 $ ->
   MediaBodyClass.init()
+
+  $(document.head).append("""
+    <style>
+      body.mobile .mobile-hide { display: none !important; }
+      body.desktop .mobile-show, body.tablet .mobile-show { display: none !important }
+    </style>   
+  """)

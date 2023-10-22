@@ -71,8 +71,22 @@ window.Pjax = class Pjax
   # refresh page, keep scroll
   @refresh: (func, opts) ->
     opts = @getOpts func, opts
+    console.log opts
     opts.no_scroll = true
     opts.no_cache = true
+
+    # prevert page flicker on refresh - start
+    pjaxNode = Pjax.node()
+    minHeight = pjaxNode.style.minHeight
+    pjaxNode.style.minHeight = pjaxNode.scrollHeight + 'px'
+    [sx, sy] = [window.scrollY, window.scrollY]
+    opts.done ||= =>
+      setTimeout =>
+        window.scrollTo(sx, sy)
+        pjaxNode.style.minHeight.minHeight
+      , 1
+    # prevert page flicker on refresh - end
+
     @fetch(opts)
 
   # reload, jump to top, no_cache http request forced

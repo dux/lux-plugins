@@ -10,14 +10,16 @@ Lux.config.sequel_dbs.each do |db|
   db.loggers << logger
 end
 
-Lux.app do
-  before do
-    Thread.current[:db_q] = { time: 0.0, cnt: 0, list:{} }
-  end
+if Lux.env.screen_log?
+  Lux.app do
+    before do
+      Thread.current[:db_q] = { time: 0.0, cnt: 0, list:{} }
+    end
 
-  after do
-    if Thread.current[:db_q] && Thread.current[:db_q][:cnt] > 0
-      Lux.log " #{Thread.current[:db_q][:cnt]} DB queries, #{(Thread.current[:db_q][:time]*1000).round(1)} ms"
+    after do
+      if Thread.current[:db_q] && Thread.current[:db_q][:cnt] > 0
+        Lux.log " #{Thread.current[:db_q][:cnt]} DB queries, #{(Thread.current[:db_q][:time]*1000).round(1)} ms"
+      end
     end
   end
 end
