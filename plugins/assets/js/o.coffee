@@ -70,6 +70,12 @@ arrayObject = (data) =>
     copy = []
     @data.forEach((el, i) => copy.push func(el, i))
     copy
+  @shuffle = () ->
+    for i in [@data.length - 1..1] by -1
+      j = Math.floor(Math.random() * (i + 1))
+      [@data[i], @data[j]] = [@data[j], @data[i]]
+    @data
+
   @
 
 O = window.O = (o) =>

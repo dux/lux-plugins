@@ -71,21 +71,8 @@ window.Pjax = class Pjax
   # refresh page, keep scroll
   @refresh: (func, opts) ->
     opts = @getOpts func, opts
-    console.log opts
     opts.no_scroll = true
     opts.no_cache = true
-
-    # prevert page flicker on refresh - start
-    pjaxNode = Pjax.node()
-    minHeight = pjaxNode.style.minHeight
-    pjaxNode.style.minHeight = pjaxNode.scrollHeight + 'px'
-    [sx, sy] = [window.scrollY, window.scrollY]
-    opts.done ||= =>
-      setTimeout =>
-        window.scrollTo(sx, sy)
-        pjaxNode.style.minHeight.minHeight
-      , 1
-    # prevert page flicker on refresh - end
 
     @fetch(opts)
 
@@ -121,7 +108,6 @@ window.Pjax = class Pjax
 
     if opts.node && !opts.node.className.includes('ajax-skip') && !opts.node.className.includes('skip-ajax')
       ajax_node = opts.node.closest(Pjax.config.ajax_selector)
-      delete opts.node
 
       if ajax_node
         opts.ajax_node = ajax_node
@@ -338,25 +324,6 @@ window.Pjax = class Pjax
     else
       window.history.pushState({}, document.title, href)
       Pjax._lastHrefCheck = href
-      
-
-  set_title_and_body: ->
-    title = @rroot.querySelector('title')?.innerHTML
-    document.title = title || 'no page title (pjax)'
-
-    if new_body = @rroot.querySelector('#'+@main_node.id)
-      # this has to be before data insert, because maybe we want to insert some JS that inserted nodes expect to be present
-      # if you need to delay execution of some code untill html is inserted, use this
-      #   window.requestAnimationFrame( ()=>...) )
-      # there should not be problems because image load hack is in place now
-      @main_node.innerHTML = Pjax.parseScripts(new_body)
-
-      Pjax.after(@href, @opts)
-      Pjax.send_global_event()
-
-      true
-    else
-      false
 
   set_data: ->
     @main_node = Pjax.node()
@@ -381,7 +348,26 @@ window.Pjax = class Pjax
       ajax_data = @rroot.querySelector('#'+ajax_id)?.innerHTML || @response
       ajax_node.innerHTML = Pjax.parseScripts(ajax_data) 
     else
-      @set_title_and_body() # is all works well, add code here
+      title = @rroot.querySelector('title')?.innerHTML
+      document.title = title || 'no page title (pjax)'
+
+      # prevert page flicker on refresh by fixing main node height
+      minHeight = @main_node.style.minHeight
+      @main_node.style.minHeight = @main_node.scrollHeight + 'px'
+      [sx, sy] = [window.scrollY, window.scrollY]
+      setTimeout =>
+        @main_node.style.minHeight.minHeight
+      , 10
+
+      if new_body = @rroot.querySelector('#'+@main_node.id)
+        # this has to be before data insert, because maybe we want to insert some JS that inserted nodes expect to be present
+        # if you need to delay execution of some code untill html is inserted, use this
+        #   window.requestAnimationFrame( ()=>...) )
+        # there should not be problems because image load hack is in place now
+        @main_node.innerHTML = Pjax.parseScripts(new_body)
+
+        Pjax.after(@href, @opts)
+        Pjax.send_global_event()
 
 # handle back button gracefully
 window.onpopstate = (event) ->

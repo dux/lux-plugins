@@ -72,7 +72,7 @@ Sequel::Model.dataset_module do
 
         for el in args
           schema = model.db_schema[el]
-          schema = {} if el.include?('->>') # if we search inside hash, add fix not to break a code
+          schema = {} if el.to_s.include?('->>') # if we search inside hash, add fix not to break a code
           
           raise ArgumentError.new('Database field "%s" not found (xlike)' % el) unless schema
 

@@ -29,7 +29,7 @@ ApplicationHelper.class_eval do
   def svelte name, opts = {}
     opts[:html] = "#{yield}".chomp if block_given?
     tag = {'data-json-template': true }.tag('s-%s' % name)
-    %[<textarea style="display:none">#{opts.to_jsonp.html_safe}</textarea>#{tag}]
+    %[<script type="text/template">#{opts.to_jsonp.html_safe}</script>#{tag}]
   end
 
   # public asset from manifest
@@ -49,7 +49,7 @@ ApplicationHelper.class_eval do
       else
         name = if Lux.env.dev?
           # do not require asset file to exist if in cli env (console, testing)
-          hash_data = Lux.env.cli? ? name : File.read('./public/assets/%s' % name)
+          hash_data = Lux.env.cli? ? name : (File.read('./public/assets/%s' % name) rescue Time.now.to_f.to_s)
           '/assets/%s?%s' % [name, Digest::SHA1.hexdigest(hash_data)[0,12]]
         else
           @json ||= JSON.load File.read('./public/manifestx.json')

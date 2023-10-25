@@ -81,7 +81,7 @@ window.CustomElement =
     else if node.getAttribute('data-json-template')
       # BEST 
       # template{ id: foo}= @object.to_jsonp
-      data = node.previousSibling?.value
+      data = node.previousSibling?.textContent
       props = if data then JSON.parse(data) else {}
     else
       props = Array.prototype.slice
