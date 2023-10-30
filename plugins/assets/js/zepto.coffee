@@ -100,7 +100,7 @@ $.eval = (...args) ->
     # params = str.match(/\((.*?)\)/)[1]
     # alert params
     func = if typeof str == 'string' then eval "(#{str})" else str
-    func(args...)
+    func(args...) if typeof func == 'function'
 
 $.fnv1 = (str) ->
   FNV_OFFSET_BASIS = 2166136261
@@ -571,10 +571,9 @@ $.fn.ajax = (path, path_state) ->
   id = @attr('id')
 
   if node[0]
-    node.attr('data-path', path) if path
-
     path ||= @attr('path') || @attr('data-path')
     path ||= location.pathname + String(location.search)
+    node.attr('data-path', path) if path
 
     $.get path, (data) =>
       html = if id
@@ -603,3 +602,21 @@ $.fn.shake = (interval = 150) ->
   @removeClass 'shaking'
 
 $.fn.isVisible = () -> @[0] && @[0].checkVisibility()
+
+# to animate image height, css transition has to be set, and you have to have starting height
+$.fn.animateHeight = (height) ->
+  img = @[0]
+  
+  if height
+    img.style.height = "#{height}px"
+    @.on 'load', -> $(img).animateHeight()
+  else
+    width = img.width
+    aspect = img.naturalWidth / img.naturalHeight
+    img.style.height = (width / aspect) + 'px'
+    
+    # reset height at end because we want natural resizeing to work
+    setTimeout ->
+      img.style.height = 'auto'
+    , 1500
+      

@@ -23,6 +23,7 @@
 #   path: what path to load
 #   replacePath: path to replace path with (on ajax state change, to have back button on different path)
 #   done: function to execute on done
+#   target: dom node to refresh
 #   node: dom node to refresh, finds closest ajax node
 #   scroll: set to false if you want to have no scroll (default for Pjax.refresh)
 #   history: set to false if you dont want to add state change to history
@@ -43,7 +44,8 @@ window.Pjax = class Pjax
 
     # if link has any of this classes, Pjax will be skipped and link will be followed
     # Example: %a.direct{ href: '/somewhere' } somewhere
-    no_pjax_class  : ['no-pjax', 'direct'],
+    no_pjax_class : ['no-pjax', 'direct'],
+    no_ajax_class : ['ajax-skip', 'skip-ajax', 'no-ajax']
 
     # if parent id found with ths class, ajax response data will be loaded in this class
     # you can add ID for better targeting. If no ID given to .ajax class
@@ -106,12 +108,21 @@ window.Pjax = class Pjax
 
     opts.path ||= @path()
 
-    if opts.node && !opts.node.className.includes('ajax-skip') && !opts.node.className.includes('skip-ajax')
-      ajax_node = opts.node.closest(Pjax.config.ajax_selector)
+    if opts.node
+      skip_ajax = false
+      for el in @config.no_ajax_class
+        skip_ajax = true if opts.node.closest(".#{el}")
+     
+      unless skip_ajax
+        ajax_node = opts.node.closest(Pjax.config.ajax_selector)
 
-      if ajax_node
-        opts.ajax_node = ajax_node
-        opts.no_scroll = true unless opts.no_scroll?
+        if ajax_node
+          opts.ajax_node = ajax_node
+          opts.no_scroll = true unless opts.no_scroll?
+
+    if opts.target
+      opts.ajax_node = opts.target
+      opts.no_scroll = true unless opts.no_scroll?
    
     if opts.path[0] == '?'
       # if href starts with ?
@@ -172,7 +183,7 @@ window.Pjax = class Pjax
     if node = document.getElementById(id)
       func = new Function node.innerText
       func()
-      node.remove()
+      node.text = 1
 
   # this hack is make inline execution work, like it works in browsers on initial load, seqential
   # after every script tag, add emppty png img that onload points to script, parse script
@@ -192,9 +203,16 @@ window.Pjax = class Pjax
               @script_cnt ||= 0
               script_tag.id = "app-sc-#{++@script_cnt}"
 
-            span = document.createElement "span"
-            span.innerHTML = """<img style="display: none;" src="data:image/gif;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==" onload="Pjax.parseSingleScript('#{script_tag.id}', this)" />"""
-            script_tag.after span
+            script_data = script_tag.textContent
+            if script_tag.getAttribute('delay') || script_data.includes('// DELAY')
+              # if delay, script will be executed once the dom is mounted
+              span = document.createElement "span"
+              span.innerHTML = """<img style="display: none;" src="data:image/gif;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==" onload="Pjax.parseSingleScript('#{script_tag.id}', this)" />"""
+              script_tag.after span
+            else
+              func = new Function(script_data)
+              func()
+              script_tag.text = 1
 
     node.innerHTML
 
@@ -216,6 +234,8 @@ window.Pjax = class Pjax
 
   @pushState: (href) ->
     window.history.pushState({}, document.title, href);
+
+  @push: (href) -> @pushState(href)
 
   # instance methods
 
@@ -316,7 +336,7 @@ window.Pjax = class Pjax
   historyAddCurrent: (href) ->
     Pjax.lastHref = href
 
-    return if @opts.no_history || @opts.ajax_node
+    return if @opts.no_history || (@opts.ajax_node && ! @opts.target)
     return if @history_added; @history_added = true
 
     if Pjax._lastHrefCheck == href
@@ -382,6 +402,12 @@ PjaxOnClick =
       event.preventDefault()
 
       href = node.getAttribute 'href'
+
+      # %a{ href: '...' hx-target: "#some-id" } -> will refresh target element, if one found
+      if hxTarget = node.getAttribute('hx-target')
+        if hxNode = document.querySelectorAll(hxTarget)[0]
+          Pjax.load href, target: hxNode
+          return
 
       if href.slice(0, 2) == '//'
         href = href.replace '/', ''
