@@ -24,7 +24,7 @@
 #   replacePath: path to replace path with (on ajax state change, to have back button on different path)
 #   done: function to execute on done
 #   target: dom node to refresh
-#   node: dom node to refresh, finds closest ajax node
+#   ajax: ajax dom node to refresh, finds closest
 #   scroll: set to false if you want to have no scroll (default for Pjax.refresh)
 #   history: set to false if you dont want to add state change to history
 #   cache: set to false if you want to force no-cache header
@@ -33,14 +33,14 @@
 window.Pjax = class Pjax
   @config = {
     # shoud Pjax log info to console
-    is_silent      : parseInt(location.port) < 1000,
+    is_silent : parseInt(location.port) < 1000,
 
     # do not scroll to top, use refresh() and not reload() on node with selectors
     no_scroll_selector : ['.no-scroll'],
 
     # skip pjax on followin links and do location.href = target
     # you can add function, regexp of string (checks for starts with)
-    paths_to_skip  : [],
+    paths_to_skip : [],
 
     # if link has any of this classes, Pjax will be skipped and link will be followed
     # Example: %a.direct{ href: '/somewhere' } somewhere
@@ -63,8 +63,9 @@ window.Pjax = class Pjax
     document.addEventListener 'click', PjaxOnClick.main
 
   # base class method to load page
-  # no_history: bool
-  # no_scroll: bool
+  # istory: bool
+  # scroll: bool
+  # cache: bool
   # done: ()=>{...}
   @load: (href, opts) ->
     opts = @getOpts href, opts
@@ -72,29 +73,30 @@ window.Pjax = class Pjax
 
   # refresh page, keep scroll
   @refresh: (func, opts) ->
+    if typeof func == 'string' && func[0] == '#'
+      opts ||= {}
+      opts.target = func
+      func = Pjax.path()
+
     opts = @getOpts func, opts
-    opts.no_scroll = true
-    opts.no_cache = true
+    opts.scroll ||= false
+    opts.cache ||= false
 
     @fetch(opts)
 
   # reload, jump to top, no_cache http request forced
   @reload: (opts) ->
     opts = @getOpts opts
-    opts.no_cache = true
+    opts.cache ||= false
     @fetch(opts)
 
   # normalize options
   @getOpts = (path, opts) ->
     opts ||= {}
 
-    opts.no_scroll  = true if opts.scroll == false
-    opts.no_history = true if opts.history == false
-    opts.no_cache   = true if opts.cache == false
-
     if typeof(path) == 'object'
       if path.nodeName
-        opts.node = path
+        opts.ajax = path
       else
         opts = path
     else if typeof(path) == 'function'
@@ -103,26 +105,30 @@ window.Pjax = class Pjax
       opts.path = path
 
     if opts.href
-      opts.path = opts.hred
+      opts.path = opts.href
       delete opts.href
 
     opts.path ||= @path()
 
-    if opts.node
+    if opts.ajax
+      opts.node = opts.ajax
+
       skip_ajax = false
       for el in @config.no_ajax_class
-        skip_ajax = true if opts.node.closest(".#{el}")
+        skip_ajax = true if opts.ajax.closest(".#{el}")
      
       unless skip_ajax
-        ajax_node = opts.node.closest(Pjax.config.ajax_selector)
-
-        if ajax_node
+        if ajax_node = opts.node.closest(Pjax.config.ajax_selector)
           opts.ajax_node = ajax_node
-          opts.no_scroll = true unless opts.no_scroll?
+          opts.scroll ||= false
+
+      delete opts.ajax
 
     if opts.target
-      opts.ajax_node = opts.target
-      opts.no_scroll = true unless opts.no_scroll?
+      if typeof opts.target == 'string'
+        opts.target = document.querySelectorAll(opts.target)[0]
+      opts.node = opts.target
+      opts.scroll ||= false
    
     if opts.path[0] == '?'
       # if href starts with ?
@@ -152,7 +158,7 @@ window.Pjax = class Pjax
   @path: ->
     location.pathname+location.search
 
-  @node: ->
+  @pjaxNode: ->
     document.getElementsByTagName('pjax')[0] || document.getElementsByClassName('pjax')[0] || alert('.pjax or #pjax not found')
 
   @console: (msg) ->
@@ -185,8 +191,6 @@ window.Pjax = class Pjax
       func()
       node.text = 1
 
-  # this hack is make inline execution work, like it works in browsers on initial load, seqential
-  # after every script tag, add emppty png img that onload points to script, parse script
   @parseScripts: (node) ->
     if typeof node == 'string'
       duplicate = node
@@ -206,6 +210,8 @@ window.Pjax = class Pjax
             script_data = script_tag.textContent
             if script_tag.getAttribute('delay') || script_data.includes('// DELAY')
               # if delay, script will be executed once the dom is mounted
+              # this hack is make inline execution work, like it works in browsers on initial load, seqential
+              # after every script tag, add emppty png img that onload points to script, parse script
               span = document.createElement "span"
               span.innerHTML = """<img style="display: none;" src="data:image/gif;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==" onload="Pjax.parseSingleScript('#{script_tag.id}', this)" />"""
               script_tag.after span
@@ -217,7 +223,7 @@ window.Pjax = class Pjax
     node.innerHTML
 
   # internal
-  @no_scroll_check: (node) ->
+  @noScrollCheck: (node) ->
     return unless node && node.closest
 
     for el in @config.no_scroll_selector
@@ -228,7 +234,7 @@ window.Pjax = class Pjax
   @last: ->
     @lastHref || @path()
 
-  @send_global_event: ->
+  @sendGlobalEvent: ->
     event = new CustomEvent('pjax:page')
     window.dispatchEvent(event);
 
@@ -278,10 +284,9 @@ window.Pjax = class Pjax
 
     @opts.req_start_time = (new Date()).getTime()
     @opts.path = @href
-    @opts.no_scroll = true if delete @opts.scroll == false
 
     headers = {}
-    headers['cache-control'] = 'no-cache' if @opts.no_cache
+    headers['cache-control'] = 'no-cache' if @opts.cache == false
     headers['x-requested-with'] = 'XMLHttpRequest'
 
     if Pjax.request
@@ -302,7 +307,7 @@ window.Pjax = class Pjax
       # console log
       time_diff = (new Date()).getTime() - @opts.req_start_time
       log_data  = "Pjax.load #{@href}"
-      log_data += if @opts.no_history then ' (back trigger)' else ''
+      log_data += if @opts.history == false then ' (back trigger)' else ''
       Pjax.console "#{log_data} (app #{@req.getResponseHeader('x-lux-speed') || 'n/a'}, real #{time_diff}ms, status #{@req.status})"
 
       # if not 200, redirect to page to show the error
@@ -316,12 +321,12 @@ window.Pjax = class Pjax
           @href = '/' + @href.join('/')
 
         # inject response in current page and process if ok
-        if @set_data()
+        if @applyLoadedData()
           # trigger opts['done'] function
           @opts.done() if typeof(@opts.done) == 'function'
 
           # scroll to top of the page unless defined otherwise
-          unless @opts.no_scroll || Pjax.no_scroll_check(@opts.node)
+          unless @opts.scroll == false || Pjax.noScrollCheck(@opts.node)
             window.scrollTo(0, 0)
         else
           # document.write @response is buggy and unsafe
@@ -332,11 +337,59 @@ window.Pjax = class Pjax
 
     false
 
+  applyLoadedData: ->
+    @pjaxNode = Pjax.pjaxNode()
+
+    unless @pjaxNode
+      Pjax.error 'template_id mismatch, full page load (use no-pjax as a class name)'
+      return
+
+    unless @pjaxNode.id
+      alert 'No ID attribute on pjax node'
+      return
+
+    @historyAddCurrent(@opts.replacePath || @href)
+
+    @rroot = document.createElement('div')
+    @rroot.innerHTML = @response
+
+    if @opts.target
+      if id = @opts.target.getAttribute('id')
+        rtarget = @rroot.querySelector('#'+id)
+        if rtarget
+          @noFlickerReplacePrepare(@opts.target)
+          @opts.target.innerHTML = rtarget.innerHTML
+          return true
+      else
+        alert('ID attribute not found on Pjax target')
+
+    if ajax_node = @opts.ajax_node
+      ajax_node.setAttribute('data-path', @href)
+      ajax_node.removeAttribute('path')
+      ajax_id = ajax_node.getAttribute('id') || alert('Pjax .ajax node has no ID')
+      ajax_data = @rroot.querySelector('#'+ajax_id)?.innerHTML || @response
+      ajax_node.innerHTML = Pjax.parseScripts(ajax_data) 
+      return true
+
+    title = @rroot.querySelector('title')?.innerHTML
+    document.title = title || 'no page title (pjax)'
+
+    @noFlickerReplacePrepare(@pjaxNode)
+
+    if new_body = @rroot.querySelector('#'+@pjaxNode.id)
+      # this has to be before data insert, because maybe we want to insert some JS that inserted nodes expect to be present
+      # if you need to delay execution of some code untill html is inserted, use this
+      #   window.requestAnimationFrame( ()=>...) ) or add comment // DELAY in inline js
+      @pjaxNode.innerHTML = Pjax.parseScripts(new_body)
+
+      Pjax.after(@href, @opts)
+      Pjax.sendGlobalEvent()
+
   # add current page to history
   historyAddCurrent: (href) ->
     Pjax.lastHref = href
 
-    return if @opts.no_history || (@opts.ajax_node && ! @opts.target)
+    return if @opts.history == false || (@opts.ajax_node && ! @opts.target)
     return if @history_added; @history_added = true
 
     if Pjax._lastHrefCheck == href
@@ -345,49 +398,15 @@ window.Pjax = class Pjax
       window.history.pushState({}, document.title, href)
       Pjax._lastHrefCheck = href
 
-  set_data: ->
-    @main_node = Pjax.node()
-
-    @historyAddCurrent(@opts.replacePath || @href)
-
-    unless @main_node
-      Pjax.error 'template_id mismatch, full page load (use no-pjax as a class name)'
-      return
-
-    unless @main_node.id
-      alert 'No ID attribute on pjax node'
-      return
-
-    @rroot = document.createElement('div')
-    @rroot.innerHTML = @response
-
-    if ajax_node = @opts.ajax_node
-      ajax_node.setAttribute('data-path', @href)
-      ajax_node.removeAttribute('path')
-      ajax_id = ajax_node.getAttribute('id') || alert('Pjax .ajax node has no ID')
-      ajax_data = @rroot.querySelector('#'+ajax_id)?.innerHTML || @response
-      ajax_node.innerHTML = Pjax.parseScripts(ajax_data) 
-    else
-      title = @rroot.querySelector('title')?.innerHTML
-      document.title = title || 'no page title (pjax)'
-
-      # prevert page flicker on refresh by fixing main node height
-      minHeight = @main_node.style.minHeight
-      @main_node.style.minHeight = @main_node.scrollHeight + 'px'
-      [sx, sy] = [window.scrollY, window.scrollY]
-      setTimeout =>
-        @main_node.style.minHeight.minHeight
-      , 10
-
-      if new_body = @rroot.querySelector('#'+@main_node.id)
-        # this has to be before data insert, because maybe we want to insert some JS that inserted nodes expect to be present
-        # if you need to delay execution of some code untill html is inserted, use this
-        #   window.requestAnimationFrame( ()=>...) )
-        # there should not be problems because image load hack is in place now
-        @main_node.innerHTML = Pjax.parseScripts(new_body)
-
-        Pjax.after(@href, @opts)
-        Pjax.send_global_event()
+  # prevert page flicker on refresh by fixing main node height
+  noFlickerReplacePrepare: (node) ->
+    minHeight = node.style.minHeight
+    node.style.minHeight = node.scrollHeight + 'px'
+    [sx, sy] = [window.scrollY, window.scrollY]
+    setTimeout =>
+      node.style.minHeight.minHeight
+    , 10
+  
 
 # handle back button gracefully
 window.onpopstate = (event) ->
@@ -443,9 +462,9 @@ PjaxOnClick =
         return window.open(window.location.origin + href.replace('/', ''), node.getAttribute('target') || href.replace(/[^\w]/g, ''))
 
       # if everything else fails, call Pjax
-      Pjax.load href, node: node
+      Pjax.load href, ajax: node
 
       false
 
 window.addEventListener 'DOMContentLoaded', () ->
-  setTimeout(Pjax.send_global_event, 0)
+  setTimeout(Pjax.sendGlobalEvent, 0)
