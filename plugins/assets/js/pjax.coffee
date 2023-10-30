@@ -57,6 +57,8 @@ window.Pjax = class Pjax
     ajax_selector  : '.ajax',
   }
 
+  @historyData = {}
+
   # you have to call this if you want to capture clicks on document level
   # Example: Pjax.onDocumentClick()
   @onDocumentClick: ->
@@ -158,7 +160,7 @@ window.Pjax = class Pjax
   @path: ->
     location.pathname+location.search
 
-  @pjaxNode: ->
+  @node: ->
     document.getElementsByTagName('pjax')[0] || document.getElementsByClassName('pjax')[0] || alert('.pjax or #pjax not found')
 
   @console: (msg) ->
@@ -242,6 +244,28 @@ window.Pjax = class Pjax
     window.history.pushState({}, document.title, href);
 
   @push: (href) -> @pushState(href)
+
+  # prevert page flicker on refresh by fixing main node height
+  @noFlickerReplacePrepare: (node) ->
+    minHeight = node.style.minHeight
+    node.style.minHeight = node.scrollHeight + 'px'
+    [sx, sy] = [window.scrollY, window.scrollY]
+    setTimeout =>
+      node.style.minHeight.minHeight
+    , 10
+
+  @setPageBody: (node, href) ->
+    title = node.querySelector('title')?.innerHTML
+    document.title = title || 'no page title (pjax)'
+    Pjax.noFlickerReplacePrepare(Pjax.node())
+    pjaxNode = Pjax.node()
+    if new_body = node.querySelector('#' + pjaxNode.id)
+      # this has to be before data insert, because maybe we want to insert some JS that inserted nodes expect to be present
+      # if you need to delay execution of some code untill html is inserted, use this
+      #   window.requestAnimationFrame( ()=>...) ) or add comment // DELAY in inline js
+      pjaxNode.innerHTML = Pjax.parseScripts(new_body)
+      Pjax.after(href, @opts)
+      Pjax.sendGlobalEvent()
 
   # instance methods
 
@@ -327,7 +351,7 @@ window.Pjax = class Pjax
 
           # scroll to top of the page unless defined otherwise
           unless @opts.scroll == false || Pjax.noScrollCheck(@opts.node)
-            window.scrollTo(0, 0)
+            window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
         else
           # document.write @response is buggy and unsafe
           # do full reload
@@ -338,7 +362,7 @@ window.Pjax = class Pjax
     false
 
   applyLoadedData: ->
-    @pjaxNode = Pjax.pjaxNode()
+    @pjaxNode = Pjax.node()
 
     unless @pjaxNode
       Pjax.error 'template_id mismatch, full page load (use no-pjax as a class name)'
@@ -357,7 +381,7 @@ window.Pjax = class Pjax
       if id = @opts.target.getAttribute('id')
         rtarget = @rroot.querySelector('#'+id)
         if rtarget
-          @noFlickerReplacePrepare(@opts.target)
+          Pjax.noFlickerReplacePrepare(@opts.target)
           @opts.target.innerHTML = rtarget.innerHTML
           return true
       else
@@ -371,19 +395,11 @@ window.Pjax = class Pjax
       ajax_node.innerHTML = Pjax.parseScripts(ajax_data) 
       return true
 
-    title = @rroot.querySelector('title')?.innerHTML
-    document.title = title || 'no page title (pjax)'
+    Pjax.historyData[Pjax.path()] = @response
 
-    @noFlickerReplacePrepare(@pjaxNode)
+    Pjax.setPageBody(@rroot, @href)
 
-    if new_body = @rroot.querySelector('#'+@pjaxNode.id)
-      # this has to be before data insert, because maybe we want to insert some JS that inserted nodes expect to be present
-      # if you need to delay execution of some code untill html is inserted, use this
-      #   window.requestAnimationFrame( ()=>...) ) or add comment // DELAY in inline js
-      @pjaxNode.innerHTML = Pjax.parseScripts(new_body)
-
-      Pjax.after(@href, @opts)
-      Pjax.sendGlobalEvent()
+  # private
 
   # add current page to history
   historyAddCurrent: (href) ->
@@ -397,21 +413,18 @@ window.Pjax = class Pjax
     else
       window.history.pushState({}, document.title, href)
       Pjax._lastHrefCheck = href
-
-  # prevert page flicker on refresh by fixing main node height
-  noFlickerReplacePrepare: (node) ->
-    minHeight = node.style.minHeight
-    node.style.minHeight = node.scrollHeight + 'px'
-    [sx, sy] = [window.scrollY, window.scrollY]
-    setTimeout =>
-      node.style.minHeight.minHeight
-    , 10
   
-
 # handle back button gracefully
 window.onpopstate = (event) ->
   window.requestAnimationFrame ->
-    Pjax.load Pjax.path(), history: false
+    path = Pjax.path()
+    if hdata = Pjax.historyData[path]
+      console.log "from history: #{path}"
+      rroot = document.createElement('div')
+      rroot.innerHTML = hdata
+      Pjax.setPageBody(rroot, path)
+    else
+      Pjax.load path, history: false
 
 PjaxOnClick =
   main: ->
