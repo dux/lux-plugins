@@ -30,7 +30,7 @@ HTMLElement.prototype.$ready = (func, time) ->
   interval = setInterval () =>
     # LOG this.checkVisibility() 
     return clearInterval interval unless document.body.contains(this)
-    if this.checkVisibility()
+    if !this.checkVisibility || this.checkVisibility()
       clearInterval interval
       func()
 

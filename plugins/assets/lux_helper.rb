@@ -70,11 +70,15 @@ ApplicationHelper.class_eval do
 
   def asset_tag name, opts={}
     opts[:crossorigin] = 'anonymous' if name.include?('http')
+    as = opts.delete :as
+    as ||= :js if name.include?('.js')
+    as ||= :css if name.include?('css')
 
-    if opts[:as] == :js || name.include?('.js')
+    case as
+    when :js
       opts[:src] = name
       opts.tag(:script).sub('&lt;script', '<script')
-    elsif opts[:as] == :css || name.include?('css')
+    when :css
       opts[:href]    = name
       opts[:media] ||= 'all'
       opts[:rel]   ||= 'stylesheet'

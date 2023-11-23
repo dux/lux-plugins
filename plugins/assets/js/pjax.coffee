@@ -267,7 +267,27 @@ window.Pjax = class Pjax
       Pjax.after(href, @opts)
       Pjax.sendGlobalEvent()
 
-  # instance methods
+  # sets or adds value to querystring
+  @qs: (key, value, opts = {}) ->
+    parts = location.search.replace(/^\?/, '').split('&').map (el) -> el.split('=', 2)
+
+    if typeof value == 'undefined'
+      parts.forEach (el) ->
+        value = decodeURIComponent(el[1]) if el[0] == key
+      value
+    else
+      qs = {}
+      parts.forEach (el) ->
+        qs[el[0]] = el[1] if el[0]
+      
+      qs[key] = encodeURIComponent value
+      data = Object.keys(qs).map((key)=> "#{key}=#{qs[key]}").join('&')
+      href = location.pathname + '?' + data
+      window.history.pushState({}, document.title, href) if opts.push
+      Pjax.push href unless opts.mock
+      href
+  
+  #
 
   constructor: (@opts) ->
     @href = @opts.href || @opts.path

@@ -24,6 +24,10 @@ window.MediaBodyClass =
       klass = if it[0] == name then name else "not-#{it[0]}"
       body.addClass klass
 
+    
+  isMobile: ->
+    document.body.classList.contains('mobile')
+
 #
 
 for i in [0..(MediaBodyClass.sizes.length - 2)]
@@ -33,12 +37,16 @@ for i in [0..(MediaBodyClass.sizes.length - 2)]
   window.matchMedia("(max-width: #{next_size}px)").addListener new Function 'e',
     "window.MediaBodyClass.set(e.matches ? '#{name}' : '#{next_name}');"
 
-$ ->
+window.requestAnimationFrame ->
   MediaBodyClass.init()
 
   $(document.head).append("""
     <style>
       body.mobile .mobile-hide { display: none !important; }
+      body.mobile .mobile-block { display: block !important; }
+      body.mobile .mobile-full { display: block !important; width: 100% !important; max-width: 100% !important; }
+      body.mobile .mobile-center { display: flex; justify-content: center; }
+      
       body.desktop .mobile-show, body.tablet .mobile-show { display: none !important }
     </style>   
   """)

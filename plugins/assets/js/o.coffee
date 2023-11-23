@@ -13,6 +13,7 @@ plainObject = (data) =>
   @keys = () => Object.keys(@data)
   @values = () => Object.values(@data)
   @qs = () => Object.entries(@data).map(([k,v]) => "#{k}=#{escape(v)}").join('&')
+  # @attrs = () => Object.entries(@data).map(([k,v]) => "{k}='#{v}'").join(' ')
   @css = () =>
     out = Object.entries(@data).map ([k,v]) =>
       v = if typeof v == 'string' then v else "#{Math.round(v)}px"

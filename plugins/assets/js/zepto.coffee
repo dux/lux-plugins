@@ -80,6 +80,10 @@ loadResource = (src, type) ->
 
 #
 
+$.prompt = (q, v, func) ->
+  r = prompt q, v || ''
+  func(r) if typeof r == 'string'
+
 $.capitalize = (str) ->
   str.charAt(0).toUpperCase() + str.slice(1)
 
@@ -398,10 +402,10 @@ $.setInterval = (name, func, every) ->
 
 $.scrollToBottom = (goNow) -> 
   if goNow == true
-    window.scrollTo(0, document.body.scrollHeight)
+    window.scrollTo({ top: document.body.scrollHeight, left: 0, behavior: 'smooth' })
   else
     setTimeout () =>
-      window.scrollTo(0, document.body.scrollHeight)
+      window.scrollTo({ top: document.body.scrollHeight, left: 0, behavior: 'smooth' })
     , goNow || 200
 
 $.saveInfo = () ->
@@ -434,6 +438,14 @@ $.saveInfo = () ->
 
   $(document.body).append(data)
   $.delay(500, () => $('#loader-bar').remove() )
+
+$.svelteNode = (name, opts) ->
+  un_name = name.replaceAll '-', '_'
+  up_name = name.replaceAll '_', '-'
+  if S[un_name]
+    """<script type="template">#{JSON.stringify(opts)}</script><s-#{up_name} data-json-template="true"></s-#{up_name}>"""
+  else
+    alert("Svelte component [#{up_name}] not defined")
 
 # node functions
 
