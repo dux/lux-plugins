@@ -118,7 +118,7 @@ window.Pjax = class Pjax
       skip_ajax = false
       for el in @config.no_ajax_class
         skip_ajax = true if opts.ajax.closest(".#{el}")
-     
+
       unless skip_ajax
         if ajax_node = opts.node.closest(Pjax.config.ajax_selector)
           opts.ajax_node = ajax_node
@@ -131,7 +131,7 @@ window.Pjax = class Pjax
         opts.target = document.querySelectorAll(opts.target)[0]
       opts.node = opts.target
       opts.scroll ||= false
-   
+
     if opts.path[0] == '?'
       # if href starts with ?
       if opts.ajax_node
@@ -245,19 +245,20 @@ window.Pjax = class Pjax
 
   @push: (href) -> @pushState(href)
 
-  # prevert page flicker on refresh by fixing main node height
-  @noFlickerReplacePrepare: (node) ->
-    minHeight = node.style.minHeight
+  # locks page scrolling to prevent jump to top of the page on refresh
+  @scrollLock: (opts = {}) ->
+    node = opts.node || Pjax.node()
     node.style.minHeight = node.scrollHeight + 'px'
-    [sx, sy] = [window.scrollY, window.scrollY]
-    setTimeout =>
-      node.style.minHeight.minHeight
-    , 10
+    setTimeout ->
+      node.style.minHeight = 'auto'
+      opts.func() if opts.func
+    , opts.delay || 10
 
+  # prevert page flicker on refresh by fixing main node height
   @setPageBody: (node, href) ->
     title = node.querySelector('title')?.innerHTML
     document.title = title || 'no page title (pjax)'
-    Pjax.noFlickerReplacePrepare(Pjax.node())
+    Pjax.scrollLock()
     pjaxNode = Pjax.node()
     if new_body = node.querySelector('#' + pjaxNode.id)
       # this has to be before data insert, because maybe we want to insert some JS that inserted nodes expect to be present
@@ -268,6 +269,7 @@ window.Pjax = class Pjax
       Pjax.sendGlobalEvent()
 
   # sets or adds value to querystring
+  # Pjax.qs('place', el.name, { push: true })
   @qs: (key, value, opts = {}) ->
     parts = location.search.replace(/^\?/, '').split('&').map (el) -> el.split('=', 2)
 
@@ -279,14 +281,19 @@ window.Pjax = class Pjax
       qs = {}
       parts.forEach (el) ->
         qs[el[0]] = el[1] if el[0]
-      
+
       qs[key] = encodeURIComponent value
       data = Object.keys(qs).map((key)=> "#{key}=#{qs[key]}").join('&')
       href = location.pathname + '?' + data
-      window.history.pushState({}, document.title, href) if opts.push
-      Pjax.push href unless opts.mock
-      href
-  
+
+      if opts.push
+        window.history.pushState({}, document.title, href) if opts.push
+        Pjax.push href unless opts.mock
+      else if opts.href
+        href
+      else
+        Pjax.load href
+
   #
 
   constructor: (@opts) ->
@@ -401,7 +408,7 @@ window.Pjax = class Pjax
       if id = @opts.target.getAttribute('id')
         rtarget = @rroot.querySelector('#'+id)
         if rtarget
-          Pjax.noFlickerReplacePrepare(@opts.target)
+          Pjax.scrollLock node: @opts.target
           @opts.target.innerHTML = rtarget.innerHTML
           return true
       else
@@ -412,7 +419,7 @@ window.Pjax = class Pjax
       ajax_node.removeAttribute('path')
       ajax_id = ajax_node.getAttribute('id') || alert('Pjax .ajax node has no ID')
       ajax_data = @rroot.querySelector('#'+ajax_id)?.innerHTML || @response
-      ajax_node.innerHTML = Pjax.parseScripts(ajax_data) 
+      ajax_node.innerHTML = Pjax.parseScripts(ajax_data)
       return true
 
     Pjax.historyData[Pjax.path()] = @response
@@ -433,7 +440,7 @@ window.Pjax = class Pjax
     else
       window.history.pushState({}, document.title, href)
       Pjax._lastHrefCheck = href
-  
+
 # handle back button gracefully
 window.onpopstate = (event) ->
   window.requestAnimationFrame ->
