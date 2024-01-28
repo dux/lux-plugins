@@ -50,16 +50,13 @@ namespace :db do
   desc 'Reset database from db/seed.sql'
   task :reset, [:fast] do |_, args|
     invoke 'db:drop'
-    invoke 'db:am'
-    DB.disconnect
+    run 'rake db:am'
     run 'rake db:am'
   end
 
   desc 'Drop database'
   task :drop do
-    DB.disconnect
     Lux.run "DB_DROP=true lux e 1"
-    DB.disconnect
   end
 
   # desc 'Create datebase'
@@ -100,7 +97,7 @@ namespace :db do
 
   desc 'Load seed from ./db/seeds '
   task :seed do
-    invoke 'db:reset'
+    # run 'rake db:reset'
 
     require './config/app'
 

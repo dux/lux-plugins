@@ -29,7 +29,8 @@ class Sequel::Model
 
     def first_or_create filter, &block
       object = first_or_new(filter, &block)
-      object.save unless object.id
+      yield object if block_given?
+      object.save
       object
     end
 

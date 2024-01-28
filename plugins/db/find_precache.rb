@@ -4,7 +4,7 @@
 #   .limit(20)
 #   .all
 #   .precache(:job_id)
-#   .precache(:org_id)
+#   .precache(:org_id, Organization)
 
 class Sequel::Model
   module ClassMethods
@@ -16,8 +16,7 @@ class Sequel::Model
     # find will cache all finds in a scope
     def find id
       key = "#{to_s}/#{id}"
-
-      hash = id.is_numeric? ? {id: id} : {ulid: id}
+      hash = {id: id}
 
       Lux.current.cache key do
         if cattr.cache_ttl

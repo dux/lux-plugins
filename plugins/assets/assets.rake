@@ -31,7 +31,7 @@ namespace :assets do
 
     manifest.write JSON.pretty_generate(json)
 
-    Lux.run "gzip -9 -k public/assets/*.*"
+    # Lux.run "gzip -9 -k public/assets/*.*"
     # Lux.run 'ls -lSrh public/assets'
 
     totals = {}

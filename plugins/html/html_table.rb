@@ -28,7 +28,7 @@ class HtmlTable
   end
 
   # define row level onclick event
-  # t.onclick { |object| "window.open('%s')" % object.dashboard_path }
+  # t.onclick { |object| "window.open('%s')" % object.dboard_path }
   def onclick &block
     @onclick = block
   end

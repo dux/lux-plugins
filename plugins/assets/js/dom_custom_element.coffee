@@ -28,7 +28,7 @@
 
 HTMLElement.prototype.$ready = (func, time) ->
   interval = setInterval () =>
-    # LOG this.checkVisibility() 
+    # LOG this.checkVisibility()
     return clearInterval interval unless document.body.contains(this)
     if !this.checkVisibility || this.checkVisibility()
       clearInterval interval
@@ -72,19 +72,18 @@ counter = 1
 
 window.CustomElement =
   attributes: (node) ->
-    props = {}
-
-    if props = node.getAttribute('data-props')
+    props =
+    if  node.getAttribute('data-props')
       # if you want to send nested complex data, best to define as data-props encoded as JSON
       # LOG props.replaceAll('"', 'x').split('Segoe UI', 2)[1]
-      props = JSON.parse(props)
+      JSON.parse(props)
     else if node.getAttribute('data-json-template')
-      # BEST 
+      # BEST
       # template{ id: foo}= @object.to_jsonp
       data = node.previousSibling?.textContent
-      props = if data then JSON.parse(data) else {}
+      if data then JSON.parse(data) else {}
     else
-      props = Array.prototype.slice
+      Array.prototype.slice
         .call(node.attributes)
         .reduce (h, el) ->
           h[el.name] = el.value;
@@ -94,7 +93,6 @@ window.CustomElement =
           h
         , {}
 
-    props ||= {}
     props.html ||= node.innerHTML
     id = node.getAttribute('id') || "svelte-block-#{counter++}"
     node.removeAttribute('id')
@@ -107,9 +105,9 @@ window.CustomElement =
       if filter
         data.replace(/&lt;/g, '<')
         data.replace(/&gt;/g, '>')
-        data.replace(/&amp;/g, '&')      
+        data.replace(/&amp;/g, '&')
       data
-    
+
     # props.$slot(target) - copy all to target
     # props.$slot(target, nodes) - copy node/nodes to target
     # props.$slot('a.link') - get slot clind node links with class name link
@@ -119,9 +117,9 @@ window.CustomElement =
           return Array.from node.querySelectorAll(":scope > #{target}")
         else
           if nodes?.nodeName
-            nodes = [nodes] 
+            nodes = [nodes]
           else if typeof nodes == 'string'
-            nodes = Array.from node.querySelectorAll(":scope > #{nodes}") 
+            nodes = Array.from node.querySelectorAll(":scope > #{nodes}")
           else
             nodes = Array.from(node.querySelectorAll(":scope > *"))
 
@@ -168,13 +166,13 @@ window.Svelte = (name, func) ->
     # Svelte(this).close() -> return first parent svelte node
     while name = name.parentNode
       return name.svelte if name.svelte
-  else 
+  else
     if name[0] == '#'
       # Svelte('#svelte-block-123').set('spinner')
       document.querySelectorAll(name)[0]?.svelte
     else
       nodes = Array.from document.querySelectorAll(".custom-element-#{name}")
-      
+
       if func
         # Svelte('s-dialog', (el) => { el.close() })
         nodes.forEach (el) -> func(el.svelte)
@@ -184,15 +182,19 @@ window.Svelte = (name, func) ->
         return nodes.map((el) => el.svelte)
 
 Svelte.index = {}
+window.S = {}
 Svelte.bind = (name, svelte_klass) ->
-  Svelte.index[name] = svelte_klass
-  CustomElement.define name, (node, opts) ->
-    # some strange bug with custom nodes double defined, this seems to fix it
-    if node.parentNode
-      props = { target: node, props: { props: opts }}
-      svelteInstance = new svelte_klass(props)
-      node.svelte = svelteInstance
-      svelteInstance.onDomMount?(svelteInstance, node)
+  key_name = name.replace(/^\w+\-/, '').replaceAll('-', '_')
+  unless Svelte.index[key_name]
+    S[key_name] = Svelte.index[key_name] = svelte_klass
+
+    CustomElement.define name, (node, opts) ->
+      # some strange bug with custom nodes double defined, this seems to fix it
+      if node.parentNode
+        props = { target: node, props: { props: opts }}
+        svelteInstance = new svelte_klass(props)
+        node.svelte = svelteInstance
+        svelteInstance.onDomMount?(svelteInstance, node)
 
 # you pass base props and default values, get filterd hash (button-tabs for details)
 # let props = Svelte.props($$props, { name: null, size: 24 })
@@ -214,7 +216,7 @@ Svelte.props = (base, obj) =>
   out.$nodes ||= nodesAsList
 
   out
-    
+
 # # bind react elements
 # bind_react: (name, klass) ->
 #   @define name, (node, opts) ->

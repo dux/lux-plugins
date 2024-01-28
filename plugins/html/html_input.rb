@@ -27,8 +27,8 @@ class HtmlInput
 
     @name = if name.is_a?(Array)
       # [:opts, :app, :posts] => model[opts][app][posts]
-      @object[name.first.to_sym] ||= {}
-      @opts[:value] ||= @object[name.first.to_sym].dig(*name.drop(1).map(&:to_s)) if @object
+      # @object[name.first.to_sym] ||= {}
+      @opts[:value] ||= @object.send(name.first.to_sym).dig(*name.drop(1).map(&:to_s)) if @object
       @opts[:name]    = name.first.to_s + name.drop(1).map{ "[#{_1}]" }.join('')
     else
       @opts[:name] = name
