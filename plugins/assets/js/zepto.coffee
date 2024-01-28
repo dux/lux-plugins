@@ -12,7 +12,7 @@
 #   window.alert = function(e){ console.warn( "Alerted: " + e ); }
 
 window.Z = $
-window.ZZ = (nodeId) => 
+window.ZZ = (nodeId) =>
   if typeof nodeId == 'string'
     nodeId = '#' + nodeId unless nodeId.includes('#')
     Z(nodeId)
@@ -80,6 +80,62 @@ loadResource = (src, type) ->
 
 #
 
+# Z.slice({foo: 123, style: 'nice'}, 'width', 'style', 'class')
+Z.slice = (data, ...args) ->
+  out = {}
+  for key in args
+    val = data[key]
+    out[key] = val if val != undefined
+  out
+
+$.delete = (data, key) =>
+  v = data[key]
+  delete data[key]
+  v
+
+$.compact = (data, opts = {}) =>
+  if Array.isArray(data)
+    data.filter (el) ->
+      ![undefined, null, 'undefined', ''].includes(el)
+  else
+    out = {}
+    Object.entries(data).forEach ([k, v]) ->
+      if !k.includes('$') && ![undefined, null, 'undefined', ''].includes(v)
+        k = k.toLowerCase() if opts.toLowerCase
+        out[k] = v
+    out
+
+$.css = (data) ->
+  if typeof data == 'object'
+    out = Object.entries(data).map ([k,v]) =>
+      v = if typeof v == 'string' then v else "#{Math.round(v)}px"
+      "#{k}: #{v};"
+    out.join(' ')
+  else
+    data.split(';').reduce((objeect, line) ->
+      [key, value] = line.trim().split(':')
+      objeect[key.trim()] = value.trim() if value
+      objeect
+    , {})
+
+$.qs = (data) ->
+  if typeof data == 'object'
+    Object.entries(data).map(([k,v]) => "#{k}=#{encodeURIComponent(v)}").join('&')
+  else
+    data.split('&').reduce((objeect, line) ->
+      [key, value] = line.trim().split('=')
+      objeect[key.trim()] = decodeURIComponent value.trim() if value
+      objeect
+    , {})
+
+
+$.JSON = (data) ->
+  if data
+    if typeof data == 'string'
+      JSON.parse(data)
+    else
+      data
+
 $.prompt = (q, v, func) ->
   r = prompt q, v || ''
   func(r) if typeof r == 'string'
@@ -109,7 +165,7 @@ $.eval = (...args) ->
 $.fnv1 = (str) ->
   FNV_OFFSET_BASIS = 2166136261
   FNV_PRIME = 16777619
-  
+
   hash = FNV_OFFSET_BASIS
 
   for i in [0..str.length - 1]
@@ -121,6 +177,12 @@ $.fnv1 = (str) ->
 
 $.htmlSafe = (text) =>
   String(text).replaceAll('#LT;', '<').replaceAll('<script', '&lt;script')
+
+$.imageSize = (url, callback) ->
+  img = new Image()
+  img.onload = () =>
+    callback({w: img.naturalWidth, h: img.naturalHeight})
+  img.src = url
 
 ulidCounter = 0
 $.ulid = ->
@@ -142,7 +204,7 @@ $.delay = (time, func) ->
 # $.untilTrue(() => { if (window.md5) { md5(key); return true}})
 $.untilTrue = (args...) ->
   if typeof args[0] == 'string'
-    func = () -> 
+    func = () ->
       if window[args[0]]
         args[1]()
         return true
@@ -165,7 +227,7 @@ $.untilTrueWhileExists = (node, func, timeout) ->
       return true unless document.body.contains(node)
       if node.checkVisibility()
         return true if func()
-  , timeout 
+  , timeout
 
 # capture key press unless in forms
 $.keyPress = (key, func) ->
@@ -208,7 +270,7 @@ $.throttle = (uid, delay, callback) ->
 
   $._throttle_hash[uid] ||= [0]
 
-  doIt = () -> 
+  doIt = () ->
     $._throttle_hash[uid][0] = new Date()
     callback()
 
@@ -252,7 +314,7 @@ $.getScript = (src, check, func) ->
         true
    else if func
     func()
-  
+
 # insert script module in the head
 # $.loadModule('https://cdn.skypack.dev/easymde', 'EasyMDE', ()=>{
 #   let editor = new EasyMDE({
@@ -400,7 +462,7 @@ $.setInterval = (name, func, every) ->
   clearInterval $._setInterval[name]
   $._setInterval[name] = setInterval func, every
 
-$.scrollToBottom = (goNow) -> 
+$.scrollToBottom = (goNow) ->
   if goNow == true
     window.scrollTo({ top: document.body.scrollHeight, left: 0, behavior: 'smooth' })
   else
@@ -449,24 +511,24 @@ $.svelteNode = (name, opts) ->
 
 # node functions
 
-# add html but do not everwrite ids
-$.fn.xhtml = (data) ->
-  id = $(@).attr('id')
+# https://svelte.dev/repl/225254b125754b7782534670815cde27
+$.fn.animateInsert = (text) ->
+  node = @[0]
 
-  unless id
-    console.warn 'ID not defined on node for $.fn.xhtml'
-    return
+  # if we want to animate reduction of text, we need tmp node
+  node.style.transition ||= 'all .3s ease-out';
+  node.style.overflow = 'hidden'
+  node.style.height ||= '0px'
 
-  @each ->
-    tmp_data = $("<div>#{data}</div>").find('#'+id)
+  test = document.createElement('div')
+  test.style.height = '0px'
+  test.innerHTML = text
+  node.insertAdjacentElement('afterend', test)
+  node.innerHTML = text
 
-    if tmp_data[0]
-      data = tmp_data[0].innerHTML
-    else
-      console.warn "ID ##{id} not found in returned HTML"
-
-    this.innerHTML = data
-
+  window.requestAnimationFrame ->
+    node.style.height = test.scrollHeight + 'px'
+    test.parentNode.removeChild(test)
 
 $.fn.slideDown = (duration) ->
   @show()
@@ -501,7 +563,7 @@ $.fn.ajaxSubmit = (callback)->
   $.ajax
     type: (form.attr('method') || 'get').toUpperCase()
     url: form.attr 'action'
-    data: form.serializeHash() 
+    data: form.serializeHash()
     headers:
       'x-tz-name': Intl.DateTimeFormat().resolvedOptions().timeZone if window.Intl
     complete: (r) =>
@@ -618,7 +680,7 @@ $.fn.isVisible = () -> @[0] && @[0].checkVisibility()
 # to animate image height, css transition has to be set, and you have to have starting height
 $.fn.animateHeight = (height) ->
   img = @[0]
-  
+
   if height
     img.style.height = "#{height}px"
     @.on 'load', -> $(img).animateHeight()
@@ -626,9 +688,9 @@ $.fn.animateHeight = (height) ->
     width = img.width
     aspect = img.naturalWidth / img.naturalHeight
     img.style.height = (width / aspect) + 'px'
-    
+
     # reset height at end because we want natural resizeing to work
     setTimeout ->
       img.style.height = 'auto'
     , 1500
-      
+
