@@ -545,6 +545,21 @@ $.fn.slideUp = (duration) ->
       display: 'none'
       height: ''
 
+# https://svelte.dev/repl/4edf94c1d3f24fb0a7d86670f194cefb
+$.fn.toggleMaxHeight = ->
+  node = @[0]
+  # node.style.transition ||= "max-height 0.2s ease-out"
+  node.style.overflow = 'hidden'
+
+  if node.style.maxHeight is ''
+    node.style.maxHeight = "#{node.scrollHeight}px"
+
+  window.requestAnimationFrame ->
+    if node.style.maxHeight is '0px'
+      node.style.maxHeight = "#{node.scrollHeight}px"
+    else
+      node.style.maxHeight = '0px'
+
 # $('form#foo').serializeHash()
 $.fn.serializeHash = ->
   hash = {}
