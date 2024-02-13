@@ -24,6 +24,7 @@
 #   replacePath: path to replace path with (on ajax state change, to have back button on different path)
 #   done: function to execute on done
 #   target: dom node to refresh
+#   form: pass form attriutes
 #   ajax: ajax dom node to refresh, finds closest
 #   scroll: set to false if you want to have no scroll (default for Pjax.refresh)
 #   history: set to false if you dont want to add state change to history
@@ -112,8 +113,14 @@ window.Pjax = class Pjax
 
     opts.path ||= @path()
 
+    if opts.form
+      for key, value of Z(opts.form).serializeHash()
+        opts.path += if opts.path.includes('?') then '&' else '?'
+        opts.path += "#{key}=#{encodeURIComponent(value)}"
+
     if opts.ajax
       opts.node = opts.ajax
+      opts.node = document.querySelector(opts.node) if typeof opts.node == 'string'
 
       skip_ajax = false
       for el in @config.no_ajax_class
