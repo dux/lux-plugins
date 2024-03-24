@@ -7,7 +7,7 @@
 window.MediaBodyClass =
   init: ->
     if document.body
-      w = window.innerWidth
+      w = document.body.clientWidth
       if w > 1023
         MediaBodyClass.set 'desktop'
       else if w > 767
@@ -29,17 +29,19 @@ window.MediaBodyClass =
     document.body.classList.contains('mobile')
 
 addEventListener "resize", MediaBodyClass.init
+addEventListener 'DOMContentLoaded', MediaBodyClass.init
 
-addEventListener 'DOMContentLoaded', ->
-  MediaBodyClass.init()
+style = document.createElement 'style'
+style.innerText = """
+  body.mobile .mobile-hide { display: none !important; }
+  body.mobile .mobile-show { display: block !important; }
+  body.mobile .mobile-inline { display: inline-block !important; }
+  body.mobile .mobile-full { display: block !important; width: 100% !important; max-width: 100% !important; }
+  body.mobile .mobile-center { display: flex; justify-content: center; }
 
-  $(document.head).append("""
-    <style>
-      body.mobile .mobile-hide { display: none !important; }
-      body.mobile .mobile-block { display: block !important; }
-      body.mobile .mobile-full { display: block !important; width: 100% !important; max-width: 100% !important; }
-      body.mobile .mobile-center { display: flex; justify-content: center; }
-
-      body.desktop .mobile-show, body.tablet .mobile-show { display: none !important }
-    </style>
-  """)
+  body.desktop .mobile-show,
+  body.desktop .mobile-inline,
+  body.tablet .mobile-show,
+  body.tablet .mobile-inline { display: none !important }
+"""
+document.head.appendChild(style)

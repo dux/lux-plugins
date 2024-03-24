@@ -24,10 +24,13 @@ window.LOG = (what...) =>
     # console.warn what
     what = what[0] if what.length < 2
     # console.log what.constructor.name
+    json = JSON.stringify(what, null, 2)
     if ['Array', 'Object'].includes(what?.constructor.name)
-      console.log(JSON.stringify(what, null, 2))
+      console.log(json)
     else
       console.log(what)
+
+    """<xmp style="font-size: 14px;">#{json}</xmp>"""
 
 window.XMP = (what) =>
   data = JSON.stringify(what, null, 2)
@@ -185,13 +188,14 @@ $.imageSize = (url, callback) ->
   img.src = url
 
 ulidCounter = 0
-$.ulid = ->
+$.ulid = (prefix) ->
   parts = [
     (new Date()).getTime(),
     String(Math.random()).replace('0.', ''),
     ++ulidCounter
   ]
-  BigInt(parts.join('')).toString(36).slice(0, 20)
+  out = BigInt(parts.join('')).toString(36).slice(0, 20)
+  if prefix then "#{prefix}-#{out}" else out
 
 $.delay = (time, func) ->
   if !func
@@ -449,13 +453,17 @@ $.resizeIframe = (obj) ->
 $.d = (obj) ->
   JSON.stringify obj, null, 2
 
+$.simpleEncodeBase = (str) -> # base64 then rot13
+  str.replace /[a-zA-Z]/g, (c) ->
+    charCode = c.charCodeAt(0)
+    baseCharCode = if c >= 'a' then 'a'.charCodeAt(0) else 'A'.charCodeAt(0)
+    String.fromCharCode(baseCharCode + ((charCode - baseCharCode + 13) % 26))
+
 $.simpleEncode = (str) -> # base64 then rot13
-  btoa(str)
-    .replace /[a-zA-Z]/g, (c) ->
-      charCode = c.charCodeAt(0)
-      baseCharCode = if c >= 'a' then 'a'.charCodeAt(0) else 'A'.charCodeAt(0)
-      String.fromCharCode(baseCharCode + ((charCode - baseCharCode + 13) % 26))
-    .replaceAll('/', '_').replace(/=+$/, '')
+  $.simpleEncodeBase btoa(str).replaceAll('/', '_').replace(/=+$/, '')
+
+$.simpleDecode = (encodedStr) ->
+  atob $.simpleEncodeBase encodedStr.replace(/_/g, '/')
 
 $._setInterval = {}
 $.setInterval = (name, func, every) ->
@@ -468,7 +476,7 @@ $.scrollToBottom = (goNow) ->
   else
     setTimeout () =>
       window.scrollTo({ top: document.body.scrollHeight, left: 0, behavior: 'smooth' })
-    , goNow || 200
+    , goNow || 300
 
 $.saveInfo = () ->
   data = """<div id="loader-bar">
@@ -621,7 +629,7 @@ $.fn.reload = (path, func) ->
   ajax_node = @parents('.ajax').first()
   ajax_node = @ unless ajax_node[0]
 
-  path  ||= ajax_node.attr('path')
+  path  ||= ajax_node.attr('data-path') || ajax_node.attr('path')
 
   unless path
     alert 'Ajax path not found'

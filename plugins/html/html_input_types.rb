@@ -49,7 +49,7 @@ class HtmlInput
 
       if @opts[:value]
         n.push ' &sdot; '
-        n.span(onclick: "document.getElementById('#{@opts[:id]}').value=''") { '&times;' }
+        n.span(class: 'btn xs danger', onclick: "document.getElementById('#{@opts[:id]}').value=''") { '&times;' }
         n.push ' &sdot; '
         n.span(class: 'gray') { Time.ago(Time.parse @opts[:value]) }
       end
@@ -97,7 +97,7 @@ class HtmlInput
       placeholder: @opts[:placeholder],
     }
   end
-  
+
   def as_memo
     @opts[:wrap] = 'wrap'
     as_textarea
@@ -106,9 +106,10 @@ class HtmlInput
   def as_checkbox
     @opts.delete(:value) if ['0', 'false', 'off'].include?(@opts[:value].to_s)
     id = Lux.current.uid
-    hidden = { :name=>@opts.delete(:name), :type=>:hidden, :value=>@opts[:value] ? 1 : '', :id=>id }
+    # let this be 1 or 0, fix other code if problems
+    hidden = { :name=>@opts.delete(:name), :type=>:hidden, :value=>@opts[:value] ? 1 : 0, :id=>id }
     @opts[:type] = :checkbox
-    @opts[:onclick] = "document.getElementById('#{id}').value=this.checked ? 1 : ''; #{@opts[:onclick]}"
+    @opts[:onclick] = "document.getElementById('#{id}').value=this.checked ? 1 : 0; #{@opts[:onclick]}"
     @opts[:checked] = 1 if @opts.delete(:value)
     @opts.tag(:input)+hidden.tag(:input)
   end

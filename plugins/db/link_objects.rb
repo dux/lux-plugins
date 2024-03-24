@@ -34,6 +34,9 @@ module Sequel::Plugins::LuxLinks
             self[:#{opts.field}] = object.id
             @#{name_s}_cached = object
           end
+          def #{opts.field.to_s.sub(/_id$/, '_sid')}= sid
+            self.#{opts.field} = sid.present? ? sid.string_id : nil
+          end
         ]
 
       # link :cities

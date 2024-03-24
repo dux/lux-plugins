@@ -1,8 +1,8 @@
 class HtmlTable
   def initialize scope, opts={}
-    opts[:id] ||= Crypt.sha1(caller[0,10].to_s)[0, 4]
-
-    @sort_param   = '%s-sort' % opts[:id]
+    # tpl = caller[0,10].select{ _1.include?('.haml') }.first || 'n/a'
+    # opts[:id] ||= Crypt.sha1(tpl)[0, 4]
+    @sort_param   = 't-sort'
     @scope        = scope
     @opts         = opts
     @cols         = []
@@ -51,6 +51,7 @@ class HtmlTable
     if sort = Lux.current.request.params[@sort_param]
       direction, field = sort.split('-', 2)
       if @scope.respond_to?(:order)
+        @scope = @scope.xwhere("#{field.db_safe} is not null")
         @scope = @scope.order(direction == 'a' ? Sequel.asc(field.to_sym) : Sequel.desc(field.to_sym))
       end
     else

@@ -52,7 +52,7 @@ logger.formatter = proc do |severity, datetime, progname, msg|
   else
     if ENV['DB_LOG'] || (!Lux.env.rake? && !msg.include?('SELECT "pg_attribute"."attname"') && !msg.end_with?('SELECT NULL'))
       $last_sql_command = msg
-      Lux.log ('DB: (%s ms) %s' % [time, msg.split('s) ', 2)[1]]).cyan
+      Lux.log (' DB: (%s ms) %s' % [time, msg.split('s) ', 2)[1]]).cyan
     end
   end
 end

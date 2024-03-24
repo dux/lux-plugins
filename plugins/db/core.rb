@@ -124,6 +124,13 @@ class Sequel::Model
       fields['%s_id' % self.class.to_s.tableize.singularize] = id
       name.to_s.classify.constantize.new(fields)
     end
+
+    def merge hash
+      for key, val in hash
+        m = "#{key}="
+        send m, val if respond_to?(m)
+      end
+    end
   end
 
   module DatasetMethods

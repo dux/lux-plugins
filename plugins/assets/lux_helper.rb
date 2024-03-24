@@ -60,7 +60,7 @@ ApplicationHelper.class_eval do
         end
       end
 
-      if root = Lux.secrets[:assets_root]
+      if root = Lux.secrets[:assets_root] ||  Lux.secrets[:cdn_root]
         name = [root, name].join
       end
 

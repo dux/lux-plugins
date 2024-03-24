@@ -515,3 +515,12 @@ PjaxOnClick =
 
 window.addEventListener 'DOMContentLoaded', () ->
   setTimeout(Pjax.sendGlobalEvent, 0)
+
+  # <form action="/search" data-pjax="true"> -> refresh full page
+  # <form action="/search" data-pjax="#search"> -> refresh search block only
+  document.body.addEventListener 'submit', (e) ->
+    form = e.target
+    if is_pjax = form.getAttribute('data-pjax')
+      e.preventDefault()
+      target = if is_pjax == 'true' then null else target
+      Pjax.load form.getAttribute('action'), form: form, target: target
