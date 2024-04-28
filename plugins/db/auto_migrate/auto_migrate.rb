@@ -22,29 +22,46 @@
 #   typero :custom_link_log
 # end
 
+# THIS IS BAD AND NEEDS HARD REFACTOR
+# initialize with database only, have clear methodts, move schema migrate to extra class
+# am = AutoMigrate.new DB; am.create_table :table_name; am.schema :table_name, &block
+
 module Typero
   class AutoMigrate
     attr_accessor :fields
     @@db = nil
 
     class << self
-      def table table_name, opts={}
-        return unless Lux.config.migrate
+      def table_create_on_inherited klass
+        def klass.inherited host
+          if ENV['DB_MIGRATE'] == 'true'
+            Typero::AutoMigrate.table host.to_s.tableize, db: host.db
+          end
+          super
+        end
+      end
 
+      def table table_name, opts = {}
         unless table_name.to_s.pluralize == table_name.to_s
           die "Table [#{table_name}] not in plural -> expected [#{table_name.to_s.pluralize}]"
         end
+
+        table_name = table_name.to_sym
 
         if [:categories].include?(table_name)
           die 'Table name "%s" is not permited' % table_name
         end
 
-        unless self.db.table_exists?(table_name.to_s)
+        db = opts[:db] || self.db
+
+        unless db.table_exists?(table_name.to_s)
           # http://sequel.jeremyevans.net/rdoc/files/doc/schema_modification_rdoc.html
-          self.db.create_table table_name do
+          db.create_table table_name do
             primary_key :id, Integer
             index :id, unique: true
           end
+
+          puts " Created table: #{table_name}"
         end
 
         if block_given?

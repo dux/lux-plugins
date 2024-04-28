@@ -14,7 +14,7 @@ def load_file file, external: false
     else
       info += ' (skipping)'
     end
-    
+
     Lux.info info
   elsif external
     Lux.info info
@@ -71,7 +71,7 @@ namespace :db do
 
   desc 'Automigrate schema'
   task am: :env do
-    Lux.config.migrate = true
+    ENV['DB_MIGRATE'] = 'true'
 
     load '%s/auto_migrate/auto_migrate.rb' % Lux.plugin(:db).folder
 

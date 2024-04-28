@@ -8,6 +8,10 @@ window.MediaBodyClass =
   init: ->
     if document.body
       w = document.body.clientWidth
+
+      if window.Pubsub
+        Pubsub.pub 'window-resize'
+
       if w > 1023
         MediaBodyClass.set 'desktop'
       else if w > 767

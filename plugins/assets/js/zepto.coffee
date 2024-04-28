@@ -11,6 +11,13 @@
 # if location.port
 #   window.alert = function(e){ console.warn( "Alerted: " + e ); }
 
+Array.range = (min, max) ->
+  @apply(null, @(max - min + 1)).map((i,j) => j + min)
+
+Array.prototype.xpush = (el) ->
+    @push el
+    @
+
 window.Z = $
 window.ZZ = (nodeId) =>
   if typeof nodeId == 'string'
@@ -82,6 +89,8 @@ loadResource = (src, type) ->
       alert "Unsupported type (#{type})"
 
 #
+
+Z.isTrue = (v) -> v && String(v) != 'false'
 
 # Z.slice({foo: 123, style: 'nice'}, 'width', 'style', 'class')
 Z.slice = (data, ...args) ->
@@ -423,6 +432,10 @@ $.cookies =
 
 # copies text to clipboard
 $.copyText = (str) ->
+  # node? pass refrence to table, to copy table
+  if typeof str != 'string'
+    str = $(str)[0].innerText.trim()
+
   el = document.createElement('textarea')
   el.value = str
   document.body.appendChild(el)
@@ -556,7 +569,7 @@ $.fn.slideUp = (duration) ->
 # https://svelte.dev/repl/4edf94c1d3f24fb0a7d86670f194cefb
 $.fn.toggleMaxHeight = ->
   node = @[0]
-  # node.style.transition ||= "max-height 0.2s ease-out"
+  node.style.transition ||= "max-height 0.2s ease-out"
   node.style.overflow = 'hidden'
 
   if node.style.maxHeight is ''
@@ -716,4 +729,14 @@ $.fn.animateHeight = (height) ->
     setTimeout ->
       img.style.height = 'auto'
     , 1500
+
+# node kind aware show
+$.fn.show = ->
+  for n in @
+    kind =
+      SPAN: 'inline-block'
+      TABLE: 'table'
+      TR: 'table-row'
+      TD: 'table-cell'
+    n.style.display = kind[n.nodeName] || 'block'
 

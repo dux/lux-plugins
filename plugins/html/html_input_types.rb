@@ -39,7 +39,7 @@ class HtmlInput
     @opts[:type]  = 'date'
 
     if @opts[:value].respond_to?(:short)
-      @opts[:value]   = @opts[:value].short(true)
+      @opts[:value] = @opts[:value].short(true)
     end
 
     tag.div do |n|
@@ -51,7 +51,7 @@ class HtmlInput
         n.push ' &sdot; '
         n.span(class: 'btn xs danger', onclick: "document.getElementById('#{@opts[:id]}').value=''") { '&times;' }
         n.push ' &sdot; '
-        n.span(class: 'gray') { Time.ago(Time.parse @opts[:value]) }
+        n.span(class: 'gray') { Time.ago(Time.parse(@opts[:value]).to_date) }
       end
     end
   end
@@ -122,8 +122,6 @@ class HtmlInput
 
     null  = @opts.delete(:null)
     value = @opts.delete(:value).to_s
-
-    rr collection
 
     body.push %[<label>#{opts.tag(:input)} #{null}</label>] if null
 

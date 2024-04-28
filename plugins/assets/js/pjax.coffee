@@ -4,10 +4,12 @@
 
 # How to use?
 
-# Pjax.captureOnClick()
+# Pjax.load('/some/page', opts)
+# Pjax.refresh()
+# Pjax.refresh('#some-node')
+
 # Pjax.error = (msg) -> Info.error msg
 # Pjax.before ->
-#
 #   Dialog.close()
 #   InlineDialog.close()
 # Pjax.after ->
@@ -80,6 +82,8 @@ window.Pjax = class Pjax
       opts ||= {}
       opts.target = func
       func = Pjax.path()
+      opts.href = Pjax.lastHref # if we want to refresh inline dialogs, s-ajax will set Pjax.lastHref and this will work
+      opts.history = false
 
     opts = @getOpts func, opts
     opts.scroll ||= false

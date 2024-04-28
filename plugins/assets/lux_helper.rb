@@ -26,10 +26,8 @@ ApplicationHelper.class_eval do
   end
 
   # swelte widget gets props inline
-  def svelte name, opts = {}
-    opts[:html] = "#{yield}".chomp if block_given?
-    tag = {'data-json-template': true }.tag('s-%s' % name)
-    %[<script type="text/template">#{opts.to_jsonp.html_safe}</script>#{tag}]
+  def svelte name, opts = {}, &block
+    Svelte.tag "s-#{name}", opts, &block
   end
 
   # public asset from manifest

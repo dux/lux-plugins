@@ -140,6 +140,7 @@ window.CustomElement =
     newSpan.setAttribute('id', attrs.$id)
     newSpan.setAttribute('class', "custom-element custom-element-#{node.nodeName.toLowerCase()}")
     newSpan.onclick = () -> node.click() if newSpan.onclick
+    # node.parentNode.insertBefore(newSpan, node);
     node.parentNode?.replaceChild(newSpan, node)
     func newSpan, attrs
 
@@ -195,6 +196,15 @@ Svelte.bind = (name, svelte_klass) ->
         svelteInstance = new svelte_klass(props)
         node.svelte = svelteInstance
         svelteInstance.onDomMount?(svelteInstance, node)
+
+        if svelteInstance.domReplaceParent # for buttons, not to be nested under <span node to break css rules
+          child = node.firstChild
+          LOG(child) if name == 's-icon'
+          child.classList.add("custom-element");
+          child.classList.add("custom-element-#{name}");
+          node.parentNode.insertBefore(child, node)
+          node.parentNode.removeChild(node)
+
 
 # you pass base props and default values, get filterd hash (button-tabs for details)
 # let props = Svelte.props($$props, { name: null, size: 24 })
