@@ -71,8 +71,6 @@ namespace :db do
 
   desc 'Automigrate schema'
   task am: :env do
-    ENV['DB_MIGRATE'] = 'true'
-
     load '%s/auto_migrate/auto_migrate.rb' % Lux.plugin(:db).folder
 
     # Sequel extension and plugin test
@@ -89,7 +87,7 @@ namespace :db do
     klasses = Typero.schema(type: :model) || raise(StandardError.new('Typero schemas not loaded'))
 
     for klass in klasses
-      Typero::AutoMigrate.typero klass
+      AutoMigrate.apply_schema klass
     end
 
     load_file './db/after.rb', external: true
