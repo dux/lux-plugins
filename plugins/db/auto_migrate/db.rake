@@ -71,6 +71,8 @@ namespace :db do
 
   desc 'Automigrate schema'
   task am: :env do
+    ENV['DB_MIGRATE'] = 'true'
+
     load '%s/auto_migrate/auto_migrate.rb' % Lux.plugin(:db).folder
 
     # Sequel extension and plugin test

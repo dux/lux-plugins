@@ -35,9 +35,10 @@ class AutoMigrate
     end
 
     def apply_schema klass
+      klass = klass.constantize if klass.class == String
       schema = Typero.schema(klass)
 
-      am = new schema.opts[:db]
+      am = new klass.db
       am.table klass, schema.rules do |f|
         for args in schema.db_schema
           if args.first == :db_rule!

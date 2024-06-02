@@ -32,6 +32,8 @@ window.LOG = (what...) =>
     what = what[0] if what.length < 2
     # console.log what.constructor.name
     json = JSON.stringify(what, null, 2)
+    if window.NO_CACHE
+      console.log('Called from: ' + (new Error()).stack.split("\n")[2].trim().split(" ")[1])
     if ['Array', 'Object'].includes(what?.constructor.name)
       console.log(json)
     else

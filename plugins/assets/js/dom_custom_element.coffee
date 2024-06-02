@@ -199,11 +199,11 @@ Svelte.bind = (name, svelte_klass) ->
 
         if svelteInstance.domReplaceParent # for buttons, not to be nested under <span node to break css rules
           child = node.firstChild
-          LOG(child) if name == 's-icon'
-          child.classList.add("custom-element");
-          child.classList.add("custom-element-#{name}");
-          node.parentNode.insertBefore(child, node)
-          node.parentNode.removeChild(node)
+          if child.classList
+            child.classList.add("custom-element");
+            child.classList.add("custom-element-#{name}");
+            node.parentNode.insertBefore(child, node)
+            node.parentNode.removeChild(node)
 
 
 # you pass base props and default values, get filterd hash (button-tabs for details)

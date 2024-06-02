@@ -35,17 +35,23 @@ window.MediaBodyClass =
 addEventListener "resize", MediaBodyClass.init
 addEventListener 'DOMContentLoaded', MediaBodyClass.init
 
-style = document.createElement 'style'
-style.innerText = """
-  body.mobile .mobile-hide { display: none !important; }
-  body.mobile .mobile-show { display: block !important; }
-  body.mobile .mobile-inline { display: inline-block !important; }
-  body.mobile .mobile-full { display: block !important; width: 100% !important; max-width: 100% !important; }
-  body.mobile .mobile-center { display: flex; justify-content: center; }
+styles = []
+points = ['mobile', 'table', 'desktop']
+for el in points
+  styles.push """
+    .#{el}-show, .#{el}-inline, .#{el}-full, .#{el}-center { display: none !important; }
+    body.#{el} {
+      .#{el}-show { display: block !important; }
+      .#{el}-inline { display: inline-block !important; }
+      .#{el}-full { display: block !important; width: 100%; max-width: 100% !important; }
+      .#{el}-center { display: flex !important; justify-content: center; }
+      .#{el}-hide { display: none !important; }
+    }
+  """
 
-  body.desktop .mobile-show,
-  body.desktop .mobile-inline,
-  body.tablet .mobile-show,
-  body.tablet .mobile-inline { display: none !important }
-"""
+style = document.createElement 'style'
+style.id = 'mobile-tablet-desktop'
+style.type = 'text/css'
+style.appendChild(document.createTextNode(styles.join("\n")))
 document.head.appendChild(style)
+
