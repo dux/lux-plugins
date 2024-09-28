@@ -7,6 +7,7 @@
 # Pjax.load('/some/page', opts)
 # Pjax.refresh()
 # Pjax.refresh('#some-node')
+# Pjax.useViewTransition = true -> use viewTransition if supported
 
 # Pjax.error = (msg) -> Info.error msg
 # Pjax.before ->
@@ -82,7 +83,7 @@ window.Pjax = class Pjax
       opts ||= {}
       opts.target = func
       func = Pjax.path()
-      opts.href = Pjax.lastHref # if we want to refresh inline dialogs, s-ajax will set Pjax.lastHref and this will work
+      # opts.href = Pjax.lastHref # if we want to refresh inline dialogs, s-ajax will set Pjax.lastHref and this will work
       opts.history = false
 
     opts = @getOpts func, opts
@@ -186,11 +187,11 @@ window.Pjax = class Pjax
   #       Dialog.load href
   #       return false
   #   true
-  @before: (func) ->
+  @before: () ->
     true
 
   # execute action after pjax load
-  @after: (func) ->
+  @after: () ->
     true
 
   # error logger, replace as fitting
@@ -275,7 +276,14 @@ window.Pjax = class Pjax
       # this has to be before data insert, because maybe we want to insert some JS that inserted nodes expect to be present
       # if you need to delay execution of some code untill html is inserted, use this
       #   window.requestAnimationFrame( ()=>...) ) or add comment // DELAY in inline js
-      pjaxNode.innerHTML = Pjax.parseScripts(new_body)
+
+      if Pjax.useViewTransition && document.startViewTransition
+        document.startViewTransition () =>
+          pjaxNode.innerHTML = Pjax.parseScripts(new_body)
+      else
+        pjaxNode.innerHTML = Pjax.parseScripts(new_body)
+
+      # pjaxNode.innerHTML = Pjax.parseScripts(new_body)
       Pjax.after(href, @opts)
       Pjax.sendGlobalEvent()
 
@@ -326,7 +334,7 @@ window.Pjax = class Pjax
     return false unless @href
 
     # if ctrl or cmd button is pressed, open in new window
-    if event && (event.which == 2 || event.metaKey)
+    if event && !event.key && (event.which == 2 || event.metaKey)
       return window.open @href
 
     if Pjax.before(@href, @opts) == false
@@ -472,6 +480,9 @@ PjaxOnClick =
       event.preventDefault()
 
       href = node.getAttribute 'href'
+
+      # to make it work onmouse dowm
+      # node.onclick = () => false
 
       # %a{ href: '...' hx-target: "#some-id" } -> will refresh target element, if one found
       if hxTarget = node.getAttribute('hx-target')

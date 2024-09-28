@@ -4,14 +4,16 @@ module Sequel::Plugins::LuxBeforeSave
       return unless defined?(User)
 
       # timestamps
-      self[:created_at] = Time.now.utc if !self[:id] && respond_to?(:created_at)
+      self[:created_at] = Time.now.utc if !self.id && respond_to?(:created_at)
       self[:updated_at] = Time.now.utc if respond_to?(:updated_at)
       self[:updated_by] = default_current_user if respond_to?(:updated_by)
+      self[:updated_by_ref] = default_current_user if respond_to?(:updated_by_ref)
 
-      if self[:id]
+      if self.id
         Lux.cache.delete "#{self.class}/#{id}"
       else
         self[:created_by] = default_current_user if respond_to?(:created_by)
+        self[:created_by_ref] = default_current_user if respond_to?(:created_by_ref)
       end
 
       super

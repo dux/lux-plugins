@@ -37,7 +37,7 @@ namespace :assets do
     totals = {}
     Dir['public/assets/*'].each do |file|
       size = File.size(file)
-      
+
       if file.include?('.gz')
         root = totals[:zip] ||= {}
         if file.include?('.css')
@@ -58,7 +58,7 @@ namespace :assets do
         end
       end
     end
-    
+
     puts 'Assets (photos) totals:'
     totals.each do |kind, type|
       type.each do |ext, size|

@@ -23,10 +23,14 @@ module Sequel::Plugins::PrimaryKeys
           record = record.where(field =>send(field))
         end
 
-        check = check.xwhere('id<>?', id) if self[:id]
+        if respond_to?(:ref) && ref
+          check = check.xwhere('ref<>?', ref)
+        elsif id
+          check = check.xwhere('id<>?', id)
+        end
 
         if found = check.first
-          raise StandardError, "Record allredy exists (id: #{found.id}, primary_keys: #{klass._primary_keys.join(',')}, class #{self.class})"
+          raise StandardError, "Record allredy exists"
         end
       end
 

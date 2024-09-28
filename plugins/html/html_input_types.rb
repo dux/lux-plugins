@@ -17,6 +17,19 @@ class HtmlInput
     else
       out
     end
+
+    if @opts[:focus]
+      out += <<~TEXT
+        <script>
+          setTimeout(()=>{
+            const el = document.getElementById('#{@opts[:id]}')
+            if (el) { el.focus() }
+          }, 100)
+        </script>
+      TEXT
+    end
+
+    out
   end
   alias :as_text :as_string
 
@@ -50,8 +63,6 @@ class HtmlInput
       if @opts[:value]
         n.push ' &sdot; '
         n.span(class: 'btn xs danger', onclick: "document.getElementById('#{@opts[:id]}').value=''") { '&times;' }
-        n.push ' &sdot; '
-        n.span(class: 'gray') { Time.ago(Time.parse(@opts[:value]).to_date) }
       end
     end
   end
@@ -86,7 +97,7 @@ class HtmlInput
     val = @opts.delete(:value) || ''
     val = val.join($/) if val.is_array?
 
-    Svelte.tag 's-input-textarea', {
+    App.tag 's-input-textarea', {
       name: @opts[:name],
       id: @opts[:id],
       value: val,

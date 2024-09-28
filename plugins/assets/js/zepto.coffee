@@ -59,12 +59,18 @@ loadResource = (src, type) ->
   if typeof src == 'string'
     type ||= if src.includes('.css') then 'css' else 'js'
   else
-    if src = src.css
+    if src.css
+      src = src.css
       type = 'css'
-    else if src = src.js
+    else if src.js
+      src = src.js
       type = 'js'
-    else if src = src.img
+    else if src.img
+      src = src.img
       type = 'img'
+    else if src.module
+      src = src.module
+      type = 'module'
 
   id = 'res-' + src.replace(/^https?/, '').replace(/[^\w]+/g, '')
 
@@ -277,24 +283,27 @@ $.debounce = (uid, delay, callback) ->
 
   $._debounce_hash[uid] = setTimeout(callback, delay)
 
-$._throttle_hash = {}
-$.throttle = (uid, delay, callback) ->
-  if typeof delay == 'function'
-    callback = delay
-    delay = 200
+# throttle but runes one last tick at the end (window, resize)
+# can be used instead of debounce to get some emidiate response
+$.throttle = (func, delay) ->
+  prev = 0
+  delayed = null
+  (...args) ->
+    now = new Date().getTime()
+    diff = now - prev
+    if diff > delay
+      prev = now
+    else
+      clearTimeout delayed
+      delayed = setTimeout(
+        ()=>func(...args)
+      , delay - diff)
 
-  $._throttle_hash[uid] ||= [0]
-
-  doIt = () ->
-    $._throttle_hash[uid][0] = new Date()
-    callback()
-
-  diff = new Date() - $._throttle_hash[uid][0]
-  if diff > delay
-    doIt()
-  else
-    clearTimeout $._throttle_hash[uid][1]
-    $._throttle_hash[uid][1] = setTimeout(doIt, delay)
+$.memoize = (fn) ->
+  cache = {}
+  (...args) ->
+    cache_id = $.fnv1 String(args)
+    cache[cache_id] ||= fn(...args)
 
 # for ajax search, will cache results
 $._cached_get = {}
@@ -335,7 +344,6 @@ $.getScript = (src, check, func) ->
 #   let editor = new EasyMDE({
 $.loadModule = (src, import_gobal, on_load) ->
   module_id = "header_module_#{$.fnv1(src)}"
-  on_load ||= () => true
 
   unless document.getElementById(module_id)
     script = document.createElement('script')
@@ -347,10 +355,9 @@ $.loadModule = (src, import_gobal, on_load) ->
     """
     document.getElementsByTagName('head')[0].appendChild script
 
-  $.untilTrue () =>
-    if window[import_gobal]
-      on_load() if on_load
-      true
+  if on_load
+    $.untilTrue import_gobal, () =>
+      on_load()
 
   src
 
@@ -493,6 +500,9 @@ $.scrollToBottom = (goNow) ->
       window.scrollTo({ top: document.body.scrollHeight, left: 0, behavior: 'smooth' })
     , goNow || 300
 
+$.random = (list) ->
+  list[Math.floor(Math.random() * list.length)]
+
 $.saveInfo = () ->
   data = """<div id="loader-bar">
     <style>
@@ -532,6 +542,12 @@ $.svelteNode = (name, opts) ->
   else
     alert("Svelte component [#{up_name}] not defined")
 
+$.times = (num, func) ->
+  out = []
+  for i in [0...num]
+    out.push func(i)
+  out
+
 # node functions
 
 # https://svelte.dev/repl/225254b125754b7782534670815cde27
@@ -568,19 +584,24 @@ $.fn.slideUp = (duration) ->
       display: 'none'
       height: ''
 
+$.fn.slideToggle = (duration) ->
+  if @css('display') == 'none'
+    $(@).slideDown()
+  else
+    $(@).slideUp()
+
 # https://svelte.dev/repl/4edf94c1d3f24fb0a7d86670f194cefb
 $.fn.toggleMaxHeight = ->
   node = @[0]
   node.style.transition ||= "max-height 0.2s ease-out"
   node.style.overflow = 'hidden'
 
-  if node.style.maxHeight is ''
-    node.style.maxHeight = "#{node.scrollHeight}px"
-
-  window.requestAnimationFrame ->
-    if node.style.maxHeight is '0px'
+  window.requestAnimationFrame =>
+    if @css('max-height') == '0px'
+      @addClass 'is-open'
       node.style.maxHeight = "#{node.scrollHeight}px"
     else
+      @removeClass 'is-open'
       node.style.maxHeight = '0px'
 
 # $('form#foo').serializeHash()
@@ -742,3 +763,48 @@ $.fn.show = ->
       TD: 'table-cell'
     n.style.display = kind[n.nodeName] || 'block'
 
+# activate target node in list, remove active from other nodes
+# $('ul li-2').activate('active')
+# <ul>
+#   <li class="li-1 active">
+#   <li class="li-2">
+$.fn.activate = (klass = 'active') ->
+  if target = @[0]
+    $(target.parentNode).find('& > *').removeClass klass
+    $(target).addClass klass
+
+
+# simple pub sub, node aware. when node is removed, no sub trigger
+# global publish, and global + node subscribe
+PUB_SUB = {}
+$.pub = (name, ...args) ->
+  if list = PUB_SUB[name]
+    PUB_SUB[name] = list.filter (el) =>
+      if typeof el == 'object'
+        if el.n.parentNode
+          el.f(...args)
+          true
+      else
+        el(...args)
+        true
+  null
+
+$.sub = (name, func) ->
+  PUB_SUB[name] ||= []
+  PUB_SUB[name].push(func)
+  null
+
+$.fn.sub = (name, func) ->
+  unless this[0].nodeName
+    console.error 'Not a DOM node given for sub', this[0]
+
+  PUB_SUB[name] ||= []
+  PUB_SUB[name].push({n: this[0], f: func})
+  @
+
+window.escapeHTML = (text) ->
+  text
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');

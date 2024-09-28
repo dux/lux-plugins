@@ -1,7 +1,7 @@
-def db_backup_file_location args
+def db_backup_file_location name
   folder = './tmp/db_dump'
   Dir.mkdir(folder) unless Dir.exist?(folder)
-  name = args[:name] || Lux.config.db_url.split('/').last
+  name = name.split('/').last if name.include?('/')
   "%s/%s.sql" % [folder, name]
 end
 
@@ -30,39 +30,86 @@ db_name = Lux.config.db_url.split('/').last
 ###
 
 namespace :db do
-  desc 'Dump/backup database backup'
-  task :dump, [:name] => :env do |_, args|
-    sql_file = db_backup_file_location args
-
-    Lux.run "pg_dump --no-privileges --no-owner --no-reconnect #{Lux.config.db_url} > #{sql_file}"
-    system 'ls -lh %s' % sql_file
+  desc 'Dump/backup database backups in raw SQL'
+  task :backup, [:name] => :env do |_, args|
+    for db in Lux.config.sequel_dbs
+      sql_file = db_backup_file_location db.opts[:database]
+      Lux.run "pg_dump --no-privileges --no-owner --no-reconnect #{db.uri} > #{sql_file}"
+      system 'ls -lh %s' % sql_file
+    end
   end
 
-  desc 'Restore database backup'
+  desc 'Restore database backups'
   task :restore, [:name] => :env do |_, args|
-    sql_file = db_backup_file_location args
-
     invoke 'db:drop'
-    # invoke 'db:create'
-    Lux.run 'psql %s < %s' % [db_name, sql_file]
+
+    for db in Lux.config.sequel_dbs
+      db_name = db.opts[:database]
+      sql_file = db_backup_file_location db_name
+      Lux.run 'psql %s < %s' % [db_name, sql_file]
+    end
   end
 
-  desc 'Reset database from db/seed.sql'
+  desc 'Reset and seed databases (db/seed.rb)'
   task :reset, [:fast] do |_, args|
     invoke 'db:drop'
     run 'rake db:am'
     run 'rake db:am'
+    run 'rake db:seed'
   end
 
-  desc 'Drop database'
+  desc 'Drop databases'
   task :drop do
-    Lux.run "DB_DROP=true lux e 1"
+    for db in Lux.config.sequel_dbs
+      db.disconnect
+      Lux.run "dropdb %s" % db.opts[:database]
+      Lux.run "createdb %s" % db.opts[:database]
+    end
   end
 
-  # desc 'Create datebase'
-  # task :create do
+  desc 'Prepare DBs for testing'
+  task :test do
+    for db in Lux.config.sequel_dbs
+      db_name = db.opts[:database]
+      test_db_name = db_name + '_tmp'
+      db.run 'drop database if exists %s' % test_db_name
+      db.run 'create database %s template %s' % [test_db_name, db_name]
+      puts "Prepared #{test_db_name}"
+    end
+  end
 
-  # end
+  desc 'Load seed from ./db/seeds '
+  task :seed do
+    for db in Lux.config.sequel_dbs
+      db.disconnect
+    end
+
+    run 'rake db:drop'
+    run 'rake db:am'
+
+    # load_file './db/seeds.rb' do
+    #   for file in Dir['db/seeds/*'].sort
+    #     puts 'Seed: %s' % file.green
+    #     load file
+    #   end
+    # end
+  end
+
+  # rake db:gen_seeds[site]
+  # Site.create({
+  #   name: "Main site",
+  #   org_id: @org.id
+  # })
+  desc 'Generate seeds'
+  task :gen_seeds, [:klass, :ref] => :app do |_, args|
+    Lux.die 'arguemnt not given => rake db:gen_seeds[model]' unless args[:klass]
+
+    klass = args[:klass].classify.constantize
+    data = klass.xwhere(ref: args[:ref]).limit(100).all.map(&:seed)
+      .join("\n\n")
+
+    puts data
+  end
 
   desc 'Run PSQL console'
   task :console do
@@ -70,7 +117,7 @@ namespace :db do
   end
 
   desc 'Automigrate schema'
-  task am: :env do
+  task :am do
     ENV['DB_MIGRATE'] = 'true'
 
     load '%s/auto_migrate/auto_migrate.rb' % Lux.plugin(:db).folder
@@ -86,43 +133,11 @@ namespace :db do
     load_file './db/before.rb'
     load_file './db/auto_migrate.rb'
 
-    klasses = Typero.schema(type: :model) || raise(StandardError.new('Typero schemas not loaded'))
-
-    for klass in klasses
-      AutoMigrate.apply_schema klass
-    end
+    # klasses = Typero.schema(type: :model) || raise(StandardError.new('Typero schemas not loaded'))
+    # for klass in klasses
+    #   AutoMigrate.apply_schema klass
+    # end
 
     load_file './db/after.rb', external: true
-  end
-
-  desc 'Load seed from ./db/seeds '
-  task :seed do
-    # run 'rake db:reset'
-
-    require './config/app'
-
-    load_file './db/seeds.rb' do
-      for file in Dir['db/seeds/*'].sort
-        puts 'Seed: %s' % file.green
-        load file
-      end
-    end
-  end
-
-  # rake db:gen_seeds[site]
-  # Site.create({
-  #   name: "Main site",
-  #   org_id: @org.id
-  # })
-  desc 'Generate seeds'
-  task :gen_seeds, [:klass] => :env do |_, args|
-    Lux.die 'arguemnt not given => rake db:gen_seeds[model]' unless args[:klass]
-
-    klass = args[:klass].classify.constantize
-    data = klass.limit(100).all.map(&:seed)
-      .join("\n\n")
-      .gsub(/(\w+)_id:\s\d+/) {|el| "#{$1}_id: @#{$1}.id" }
-
-    puts data
   end
 end

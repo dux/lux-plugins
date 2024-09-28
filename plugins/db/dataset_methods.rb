@@ -73,7 +73,7 @@ Sequel::Model.dataset_module do
         for el in args
           schema = model.db_schema[el]
           schema = {} if el.to_s.include?('->>') # if we search inside hash, add fix not to break a code
-          
+
           raise ArgumentError.new('Database field "%s" not found (xlike)' % el) unless schema
 
           if schema[:db_type] == 'jsonb'
@@ -136,11 +136,11 @@ Sequel::Model.dataset_module do
   end
 
   def desc
-    xorder('%s.id desc' % model.to_s.tableize)
+    xorder('%s.created_at desc' % model.to_s.tableize)
   end
 
   def asc
-    xorder('%s.id asc' % model.to_s.tableize)
+    xorder('%s.created_at asc' % model.to_s.tableize)
   end
 
   def pluck field

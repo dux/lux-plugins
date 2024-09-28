@@ -2,7 +2,7 @@ Sequel::Model.dataset_module do
   # only postgree
   # Bucket.can.all_tags -> all_tags mora biti zadnji
   def all_tags opts = {}
-    opts[:field] = opts if opts.class == Symbol
+    opts = {tags: opts} if opts.class == Symbol
     limit = opts[:limit] || 20
     field = opts[:tags] || :tags
     sqlq = sql.split(' FROM ')[1]

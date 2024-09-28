@@ -16,7 +16,7 @@ class Sequel::Model
     # find will cache all finds in a scope
     def find id
       key = "#{to_s}/#{id}"
-      hash = {id: id}
+      hash = id.is_numeric? ? {id: id} : {ref: id}
 
       Lux.current.cache key do
         if cattr.cache_ttl
@@ -34,21 +34,21 @@ class Sequel::Model
   end
 end
 
-class Array
-  # we have to call all on set and then precache
-  def precache field, klass=nil
-    list = self
-      .select{ |it| it && it[field] }
-      .map{ |it| it[field] }
-      .uniq
-      .sort
+# class Array
+#   # we have to call all on set and then precache
+#   def precache field, klass=nil
+#     list = self
+#       .select{ |it| it && it[field] }
+#       .map{ |it| it[field] }
+#       .uniq
+#       .sort
 
-    klass ||= field.to_s.sub(/_ids?$/, '').classify.constantize
+#     klass ||= field.to_s.sub(/_ids?$/, '').classify.constantize
 
-    for el in klass.where(id: list).all
-      Lux.current.cache("#{klass}/#{el.id}") { el.dup }
-    end
+#     for el in klass.where(id: list).all
+#       Lux.current.cache("#{klass}/#{el.id}") { el.dup }
+#     end
 
-    self
-  end
-end
+#     self
+#   end
+# end

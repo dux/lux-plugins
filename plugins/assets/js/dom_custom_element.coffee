@@ -1,3 +1,26 @@
+# Svelte custom DOM nodes
+# https://github.com/sveltejs/svelte/issues/1748
+
+# I could refactor it to work with Mutation observer
+# const observer = new MutationObserver((mutationsList) => {
+#   for (let mutation of mutationsList) {
+#     if (mutation.type === 'childList') {
+#       for (let node of mutation.addedNodes) {
+#         if (node.nodeType === Node.ELEMENT_NODE) {
+#           console.log(node.nodeName)
+#         }
+#       }
+#     }
+#   }
+# });
+
+# document.addEventListener("DOMContentLoaded", ()=>{
+#   const config = { childList: true, attributes: true };
+#   observer.observe(document.body, config);
+# })
+
+
+
 # React to do
 # ReactDOM.render(React.createElement(SomeReactComponent, { foo: 'bar' }), dom_node);
 
@@ -73,7 +96,7 @@ counter = 1
 window.CustomElement =
   attributes: (node) ->
     props =
-    if  node.getAttribute('data-props')
+    if node.getAttribute('data-props')
       # if you want to send nested complex data, best to define as data-props encoded as JSON
       # LOG props.replaceAll('"', 'x').split('Segoe UI', 2)[1]
       JSON.parse(props)
@@ -196,6 +219,7 @@ Svelte.bind = (name, svelte_klass) ->
         svelteInstance = new svelte_klass(props)
         node.svelte = svelteInstance
         svelteInstance.onDomMount?(svelteInstance, node)
+        LOG "Svelte: #{name}"
 
         if svelteInstance.domReplaceParent # for buttons, not to be nested under <span node to break css rules
           child = node.firstChild

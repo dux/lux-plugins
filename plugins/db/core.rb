@@ -33,37 +33,18 @@ class Sequel::Model
       object.save
       object
     end
-
-    [
-      :validate,
-      :before_create,
-      :before_save,
-      :after_create,
-      :after_save,
-      :before_destroy,
-      :after_destroy,
-      :after_change
-    ].each do |el|
-      eval %[
-        def #{el} &block
-          define_method :#{el} do
-            instance_exec &block
-            super()
-          end
-        end
-      ]
-    end
   end
 
   module InstanceMethods
-    def key
-      "%s/%s" % [self.class, self[:id]]
+    def key namespace = nil
+      v = "%s/%s" % [self.class, self[:ref] || self[:id]]
+      namespace ? "#{v}/#{namespace}" : v
     end
 
     def cache_key namespace = nil
       key =
       if self[:updated_at]
-        "%s/%s-%s" % [self.class, self[:id], self[:updated_at].to_f]
+        "%s/%s-%s" % [self.class, self.id, self[:updated_at].to_f]
       else
         self.key
       end
@@ -81,11 +62,13 @@ class Sequel::Model
     alias :to_h :attributes
 
     def creator
-      self[:created_by] ? User.find(self[:created_by]) : nil
+      v = self[:created_by_ref] || self[:created_by]
+      v ? User.find(v) : nil
     end
 
     def updater
-      self[:updated_by] ? User.find(self[:updated_by]) : nil
+      v = self[:updated_by_ref] || self[:updated_by]
+      v ? User.find(v) : nil
     end
 
     def parent_model

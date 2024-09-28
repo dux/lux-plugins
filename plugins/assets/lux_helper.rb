@@ -45,7 +45,7 @@ ApplicationHelper.class_eval do
       if name[0,1] == '/'
         name += '?%s' % Digest::SHA1.hexdigest(File.read('./public%s' % name))[0,12]
       else
-        name = if Lux.env.dev?
+        name = if Lux.env.reload_code?
           # do not require asset file to exist if in cli env (console, testing)
           hash_data = Lux.env.cli? ? name : (File.read('./public/assets/%s' % name) rescue Time.now.to_f.to_s)
           '/assets/%s?%s' % [name, Digest::SHA1.hexdigest(hash_data)[0,12]]

@@ -1,28 +1,81 @@
 # lnk models AR style
 
 module Sequel::Plugins::LuxLinks
-  LUX_LINK ||= {}
+  LUX_REF_CACHE_CLEAR ||= {}
 
   module ClassMethods
+    def ref name, opts = {}
+      opts = opts.to_hwia :class, :field, :cache
+
+      if name.class != Symbol
+        # OrgUser.ref(@org) - @org_user.org_ref = @org.ref
+        f = "#{name.class.to_s.underscore}_ref".to_sym
+        if db_schema[f]
+          where(f => name.id)
+        else
+          # Comment.ref(@task) - @comment.parent_ref = @task.ref
+          where(parent_ref: name.ref)
+        end
+      else
+        name = name.to_s
+        klass = opts[:class] ? opts[:class].to_s : name.to_s.singularize.classify
+        field = (opts[:field] || "#{name}_ref").to_s
+
+        if name == name.singularize
+          # ref :user (user_ref)
+          field = db_schema[field.to_sym] ? field : :parent_ref
+          class_eval <<-STR, __FILE__, __LINE__ + 1
+            def #{name}
+              #{klass}.find(#{field})
+            end
+          STR
+        else
+          field = "#{name.to_s.singularize}_refs".to_sym
+
+          if db_schema[field.to_sym]
+            # ref :users (user_refs [])
+            class_eval <<-STR, __FILE__, __LINE__ + 1
+              def #{name}
+                #{field}.or([]).map { #{klass}.find(_1) }
+              end
+            STR
+          else
+            host = name.classify.constantize
+            LUX_REF_CACHE_CLEAR[host.to_s] ||= []
+            LUX_REF_CACHE_CLEAR[host.to_s].push to_s.underscore
+
+            # filed = host.respond_to?("#{self.to_s.underscore}_ref") : "#{self.to_s.underscore}_ref" : :parent_ref
+
+            # Org.ref :projects -> @org.projects
+            action_field = "#{self.to_s.underscore}_ref".to_sym
+            action =
+            if host.db_schema[action_field]
+              "#{klass}.default.where(#{action_field}: ref)"
+            else
+              "#{klass}.default.where(parent_ref: key)"
+            end
+            # ap [to_s, name, action_field, action].join(' - ')
+            class_eval <<-STR, __FILE__, __LINE__ + 1
+              def #{name}
+                #{action}
+              end
+            STR
+          end
+        end
+      end
+    end
+
     # Object.genders
     # @object.gender
-    def link name, opts={}
-      opts = opts.to_hwia :class, :touch, :polymorphic, :counter, :name, :field
+    def link name, opts = {}
+      opts = opts.to_hwia :class, :polymorphic, :field
 
       name_s = name.to_s.singularize
       name_p = name.to_s.pluralize
 
       klass = opts[:class] ? opts[:class].to_s : name.to_s.singularize.classify
 
-      if opts.counter.class == TrueClass
-        opts.counter = '%s_count' % name_p
-      end
-
       opts.field ||= '%s_id' % name_s
-      opts.name    = name
-
-      LUX_LINK[to_s] ||= {}
-      LUX_LINK[to_s][klass] = opts
 
       # link :country, class: Country -> many_to_one :country
       if name.to_s == name_s
@@ -101,30 +154,55 @@ module Sequel::Plugins::LuxLinks
   end
 
   module InstanceMethods
-    def after_save
+    def after_create
+      _lux_refs_update_counts
       super
-      _lux_link_callbaks
+    end
+
+    def after_save
+      _lux_refs_clear_cache
+      super
     end
 
     def after_destroy
+      _lux_refs_clear_cache
+      _lux_refs_update_counts
       super
-      _lux_link_callbaks
     end
 
-    def _lux_link_callbaks
-      for klass, opts in LUX_LINK[self.class.to_s].or({})
-        # Task.link :card, touch: true
-        #   will touch @task.card (to clear caches) when @task changes
-        # if opts.touch
-        #   send(opts.name).touch
-        # end
+    def _lux_refs_clear_cache
+      for o in (LUX_REF_CACHE_CLEAR[self.class.to_s] || [])
+        if respond_to?(o)
+          # clears cache in linked objects
+          # Project.ref :tasks
+          # @task.update -> Lux.cache.delete(@task.project.cache_key/tasks)
+          # project.update tasks_count: project.tasks.count
+          target = send(o)
+          key = [target.key, self.class.to_s.underscore.pluralize].join('/')
+          Lux.cache.delete key
+        end
+      end
+    end
 
-        # Asset.link :card, counter: true
-        #   will update cache on @card.assets_count when @card.asset changes
-        if counter_name = opts.counter
-          parent = send opts.name
-          parent.send counter_name, self.class.where(opts.field => id).count
-          parent.save
+    def _lux_refs_update_counts
+      if respond_to?(:parent_key)
+        plural = self.class.to_s.tableize
+        count_field = "#{plural}_count"
+        if parent.respond_to?(count_field) && parent.respond_to?(plural)
+          parent.this.update count_field => parent.send(plural).count
+        end
+      end
+
+      for o in (LUX_REF_CACHE_CLEAR[self.class.to_s] || [])
+        if respond_to?(o)
+          # update counts
+          # Project.ref :tasks -> update @project.tasks_count when task changes (if exists)
+          target = send(o)
+          plural = self.class.to_s.tableize
+          count_key = "#{plural}_count"
+          if target.respond_to?(count_key)
+            target.this.update count_key => target.send(plural).count
+          end
         end
       end
     end

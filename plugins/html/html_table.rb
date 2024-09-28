@@ -66,61 +66,63 @@ class HtmlTable
 
     prepare_as_blocks
 
-    HtmlTag.table(class: @opts[:class], 'data-fields': @cols.map{ |o| }) do |n|
-      n.thead do |n|
-        n.tr do |n|
-          for opts in @cols
-            th_opts = {}
+    HtmlTag.div(class: :table) do |n|
+      n.table(class: @opts[:class], 'data-fields': @cols.map{ |o| }) do |n|
+        n.thead do |n|
+          n.tr do |n|
+            for opts in @cols
+              th_opts = {}
 
-            style = []
-            style.push 'width: %dpx' % opts[:width] if opts[:width]
+              style = []
+              style.push 'width: %dpx' % opts[:width] if opts[:width]
 
-            if align = opts[:align]
-              case align
-              when :r
-                align = :right
-              when :c
-                align = :center
-              when :l
-                align = :left
+              if align = opts[:align]
+                case align
+                when :r
+                  align = :right
+                when :c
+                  align = :center
+                when :l
+                  align = :left
+                end
+
+                style.push 'text-align: %s' % align
               end
 
-              style.push 'text-align: %s' % align
-            end
+              th_opts[:style] = style.join('; ') if style.first
 
-            th_opts[:style] = style.join('; ') if style.first
+              title = opts[:title]
+              title = opts[:field].to_s.humanize if title.nil? && opts[:field]
 
-            title = opts[:title]
-            title = opts[:field].to_s.humanize if title.nil? && opts[:field]
+              if sort = opts[:sort]
+                field     = sort.is_a?(Symbol) ? sort : opts[:field]
+                direction = Lux.current.request.params[@sort_param].to_s[0, 2] == 'a-' ? 'd-' : 'a-'
 
-            if sort = opts[:sort]
-              field     = sort.is_a?(Symbol) ? sort : opts[:field]
-              direction = Lux.current.request.params[@sort_param].to_s[0, 2] == 'a-' ? 'd-' : 'a-'
-
-              title = HtmlTag.span(class: 'table-sort table-sort-%ssort' % direction) do |n|
-                n.a(href: Url.qs(@sort_param, direction + field.to_s) ) { title }
+                title = HtmlTag.span(class: 'table-sort table-sort-%ssort' % direction) do |n|
+                  n.a(href: Url.qs(@sort_param, direction + field.to_s) ) { title }
+                end
               end
-            end
 
-            n.th title, th_opts
+              n.th title, th_opts
+            end
           end
         end
-      end
 
-      n.tbody do |n|
-        for object in @scope.all
-          tr_opts = {}
+        n.tbody do |n|
+          for object in @scope.all
+            tr_opts = {}
 
-          if @onclick
-            tr_opts[:onclick] = @onclick.call object
-          end
+            if @onclick
+              tr_opts[:onclick] = @onclick.call object
+            end
 
-          allowed = [:id, :class, :href, :style, :width, :align, :onclick]
+            allowed = [:id, :class, :href, :style, :width, :align, :onclick]
 
-          n.tr(tr_opts.slice(*allowed)) do |n|
-            for opts in @cols
-              content = render_row object, opts
-              n.td content, opts.slice(*allowed)
+            n.tr(tr_opts.slice(*allowed)) do |n|
+              for opts in @cols
+                content = render_row object, opts
+                n.td content, opts.slice(*allowed)
+              end
             end
           end
         end

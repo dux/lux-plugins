@@ -44,7 +44,10 @@ class Sequel::Model
         define_method(opts[:method]) do
           value = send(opts[:field])
           return unless value.present?
-          values[value.to_s] || raise('Key "%s" not found' % value)
+
+          out = values[value.to_s]
+          raise('Key "%s" not found' % value) if !out && opts[:validate] != false
+          out || value
         end
       end
 

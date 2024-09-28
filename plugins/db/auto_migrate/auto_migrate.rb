@@ -1,39 +1,29 @@
 # https://github.com/jeremyevans/sequel/blob/master/doc/schema_modification.rdoc
 
-# class City < ApplicationModel
-#   link :country
+# class User < ApplicationModel
+#   schema do
+#     name meta: { label: 'Puno ime sa titulom' }
+#     email :email, meta: { unique: 'Email is vec registriran' }
 
-#   attributes migrate: true do
-#     string    :name, req: 'City name is required'
-#     point     :lon_lat
-#     string    :image
-#     integer   :country_id, req: true
-#     boolean   :is_active
-
-#     db :timestamps
+#     timestamps
 #   end
 # end
 
-# AutoMigrate.migrate DB_LOG do
-#   table :custom_links_logs do |t|
-#     t.string   'name', null: true
-#     t.string   'email'
-#   end
-#   typero :custom_link_log
-# end
+module Sequel::Plugins::AutoMigrate
+  def self.apply(model)
+    def model.inherited(subclass)
+      if subclass.name && ENV['DB_MIGRATE'] == 'true'
+        AutoMigrate.new(subclass.db).table subclass.to_s.tableize
+      end
+      super
+    end
+  end
+end
+
+Sequel::Model.plugin :auto_migrate
 
 class AutoMigrate
   class << self
-    # patch Sequel::Model to create table when needed on inherited
-    def create_table klass
-      if ENV['DB_MIGRATE'] == 'true'
-        def klass.inherited host
-          AutoMigrate.new(host.db).table host.to_s.tableize
-          super
-        end
-      end
-    end
-
     def apply_schema klass
       klass = klass.constantize if klass.class == String
       schema = Typero.schema(klass)
@@ -41,14 +31,17 @@ class AutoMigrate
       am = new klass.db
       am.table klass, schema.rules do |f|
         for args in schema.db_schema
-          if args.first == :db_rule!
+          if args.first != :db_rule!
+            f.send args[1], args[0], args[2]
+          else
             args.shift
             f.db_rule *args
-          else
-            f.send args[1], args[0], args[2]
           end
         end
       end
+
+      klass.db.schema(klass.to_s.tableize, reload: true)
+      klass
     end
   end
 
@@ -78,12 +71,14 @@ class AutoMigrate
     # create table unless it exists
     unless self.db.table_exists?(@table_name.to_s)
       # http://sequel.jeremyevans.net/rdoc/files/doc/schema_modification_rdoc.html
-      self.db.create_table @table_name do
-        primary_key :id, Integer
-        index :id, unique: true
-      end
 
-      puts " Created table: #{@table_name}"
+      DB.create_table(@table_name) do
+        if ENV['DB_USE_REF']
+          String :ref, primary_key: true
+        else
+          Integer :id, primary_key: true
+        end
+      end
     end
 
     @db_indexes = self.db.fetch(%[SELECT indexname FROM pg_indexes WHERE tablename = '#{@table_name}';])
@@ -102,10 +97,6 @@ class AutoMigrate
     end
   end
 
-  def enable_extension name
-    self.db.run 'CREATE EXTENSION IF NOT EXISTS %s;' % name
-  end
-
   def transaction_do text
     begin
       self.db.run 'BEGIN; %s ;COMMIT;' % text
@@ -114,6 +105,10 @@ class AutoMigrate
       puts text.yellow
       raise $!
     end
+  end
+
+  def enable_extension name
+    self.db.run 'CREATE EXTENSION IF NOT EXISTS %s;' % name
   end
 
   def extension name
@@ -144,14 +139,11 @@ class AutoMigrate
   def get_db_column_type field
     type, opts = @fields[field]
     db_type = type
-    db_type = :varchar if type == :string
-    db_type = Time if type == :datetime
+    db_type = "varchar(#{opts[:limit] || 255})" if type == :string
+    db_type = :timestamp if type == :timestamp
 
     if opts[:array]
-      db_type = '%s(%s)' % [db_type, opts[:limit]] if type == :string
       db_type = '%s[]' % db_type
-    else
-      db_type = 'varchar(%s)' % opts[:limit] if opts[:limit]
     end
 
     db_type
@@ -161,7 +153,7 @@ class AutoMigrate
     puts "Table #{@table_name.to_s.yellow}, #{@fields.keys.length} fields in #{self.db.uri.split('/').last}"
 
     # remove extra fields
-    for field in (@object.keys - @fields.keys - [:id])
+    for field in (@object.keys - @fields.keys - [:id, :ref])
       was_name = @opts.select { _2.dig(:meta, :was) == field }.keys.first
 
       unless was_name
@@ -191,7 +183,7 @@ class AutoMigrate
       # create missing columns
       unless @object[field.to_sym]
         if db_type == :jsonb
-          transaction_do "ALTER TABLE #{@table_name} ADD COLUMN #{field} jsonb DEFAULT '{}';"
+          transaction_do "ALTER TABLE #{@table_name} ADD COLUMN #{field} jsonb DEFAULT '{}' NOT NULL;"
         else
           self.db.add_column @table_name, field, db_type, opts
 
@@ -266,6 +258,7 @@ class AutoMigrate
 
         # covert string to date
         if current[:type] == :string && [:date, :datetime].include?(type)
+          type = :timestamp if type == :datetime
           log_run "ALTER TABLE #{@table_name} ALTER COLUMN #{field} TYPE #{type.to_s.upcase} using #{field}::#{type};"
         end
 
@@ -304,10 +297,16 @@ class AutoMigrate
     case type.to_sym
     when :timestamps
       opts[:null] ||= false
-      @fields[:created_at] = [:datetime, opts]
-      @fields[:created_by] = [:integer, opts]
-      @fields[:updated_at] = [:datetime, opts]
-      @fields[:updated_by] = [:integer, opts]
+      @fields[:created_at] = [:timestamp, opts]
+      @fields[:updated_at] = [:timestamp, opts]
+
+      if ENV['DB_USE_REF']
+        @fields[:created_by_ref] = [:string, opts]
+        @fields[:updated_by_ref] = [:string, opts]
+      else
+        @fields[:created_by] = [:integer, opts]
+        @fields[:updated_by] = [:integer, opts]
+      end
     when :polymorphic
       opts ||= :model
       @fields["#{name}_id".to_sym]   = [:integer, opts.merge(index: true) ]
@@ -365,7 +364,7 @@ class AutoMigrate
     name = args[0]
     opts = args[1] || {}
 
-    if [:string, :integer, :text, :boolean, :datetime, :date, :geography].index(type)
+    if [:string, :integer, :text, :boolean, :datetime, :date, :geography, :timestamp].index(type)
       @fields[name.to_sym] = [type, opts]
     elsif type == :jsonb
       opts[:default] = {}

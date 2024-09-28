@@ -22,8 +22,17 @@ module Sequel::Plugins::ParentModel
     end
 
     # @board.parent -> @list
-    def parent
-      if key = self[:parent_key]
+    def parent obj = nil
+      if obj
+        if obj.respond_to?(:parent_key)
+          self.parent_key = obj.key
+        else
+          self.parent_ref = obj.ref
+          self.parent_type = obj.class.to_s
+        end
+
+        self
+      elsif key = self[:parent_key]
         key = key.split('/')
         key[0].constantize.find(key[1])
       elsif key = self[:parent_type]
@@ -43,7 +52,7 @@ module Sequel::Plugins::ParentModel
   module ClassMethods
     def for_parent object
       if key = db_schema[:parent_key]
-        where(parent_key: '%s/%d' % [object.class.to_s, object.id])
+        where(parent_key: object.key)
       elsif key = db_schema[:parent_type]
         where(parent_id: object.id, parent_type: object.class.to_s)
       else
