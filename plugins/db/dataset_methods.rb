@@ -100,7 +100,9 @@ Sequel::Model.dataset_module do
   # Card.last_updated
   # Card.last_updated epic_ids: @epic.id
   def last_updated rules=nil
-    field = model.db_schema[:updated_at] ? :updated_at : :id
+    field = model.db_schema[:updated_at] && :updated_at
+    field ||= model.db_schema[:created_at] && :created_at
+    field ||= :id
     base = rules ? xwhere(rules) : self
     base.order(Sequel.desc(field)).first
   end
@@ -119,11 +121,17 @@ Sequel::Model.dataset_module do
       where Sequel.lit '%s=%i' % [field_name, obj.id]
     elsif model.db_schema["#{n2}_ids".to_sym]
       where Sequel.lit '%i=any(%s_ids)' % [obj.id, n2]
+    elsif model.db_schema["#{n2}_refs".to_sym]
+      where Sequel.lit '%i=any(%s_refs)' % [obj.ref, n2]
     elsif model.db_schema[:parent_key]
       where(parent_key: obj.key)
     elsif model.db_schema[:model_type]
       # should use parent_id and for_parent(@object)
-      where(model_type: obj.class.to_s, model_id: obj.id)
+      if model.db_schema[:model_ref]
+        where(model_type: obj.class.to_s, model_ref: obj.ref)
+      else
+        where(model_type: obj.class.to_s, model_id: obj.id)
+      end
     elsif obj.class.to_s == 'User'
       if obj.respond_to?(field_name)
         where Sequel.lit '%s=?' % [field_name, obj.id]
@@ -135,8 +143,9 @@ Sequel::Model.dataset_module do
     end
   end
 
-  def desc
-    xorder('%s.created_at desc' % model.to_s.tableize)
+  def desc field = nil
+    field ||= :created_at
+    xorder('%s.%s desc' % [model.to_s.tableize, field])
   end
 
   def asc
@@ -149,11 +158,17 @@ Sequel::Model.dataset_module do
 
   # Job.active.ids(:org_id) -> distinct array of org_id
   # Job.active.ids          -> array of id
-  def ids field=:id
-    sql = select(field).order(nil).distinct(field).sql
+  def ids field = nil
+    field ||= model.db_schema[:ref] ? :ref : :id
+    sql = [:id, :ref].include?(field) ? select(field).sql : select(field).order(nil).distinct(field).sql
     db[sql].to_a.map { |it| it[field] }.tap do |out|
       out[0] ||= 0
     end
+  end
+
+  def last num = nil
+    base = xorder('%s desc' % [model.db_schema[:ref] ? :created_at : :id])
+    num ? base.limit(num).all : base.first
   end
 end
 

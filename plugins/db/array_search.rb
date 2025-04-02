@@ -1,5 +1,5 @@
 Sequel::Model.dataset_module do
-  # only postgree
+  # Show all tags on recordset
   # Bucket.can.all_tags -> all_tags mora biti zadnji
   def all_tags opts = {}
     opts = {tags: opts} if opts.class == Symbol

@@ -86,4 +86,11 @@ ApplicationHelper.class_eval do
     end
   end
 
+  def request
+    Lux.current.request
+  end
+
+  def response
+    Lux.current.response
+  end
 end

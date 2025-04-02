@@ -47,9 +47,9 @@ window.Pjax = class Pjax
     paths_to_skip : [],
 
     # if link has any of this classes, Pjax will be skipped and link will be followed
-    # Example: %a.direct{ href: '/somewhere' } somewhere
+    # Example: %a.direct{ href '/somewhere' } somewhere
     no_pjax_class : ['no-pjax', 'direct'],
-    no_ajax_class : ['ajax-skip', 'skip-ajax', 'no-ajax']
+    no_ajax_class : ['ajax-skip', 'skip-ajax', 'no-ajax', 'top']
 
     # if parent id found with ths class, ajax response data will be loaded in this class
     # you can add ID for better targeting. If no ID given to .ajax class
@@ -88,7 +88,7 @@ window.Pjax = class Pjax
 
     opts = @getOpts func, opts
     opts.scroll ||= false
-    opts.cache ||= false
+    # opts.cache ||= false
 
     @fetch(opts)
 
@@ -249,8 +249,8 @@ window.Pjax = class Pjax
     @lastHref || @path()
 
   @sendGlobalEvent: ->
-    event = new CustomEvent('pjax:page')
-    window.dispatchEvent(event);
+    document.dispatchEvent new Event('DOMContentLoaded')
+    document.dispatchEvent new CustomEvent('pjax:render')
 
   @pushState: (href) ->
     window.history.pushState({}, document.title, href);
@@ -259,12 +259,14 @@ window.Pjax = class Pjax
 
   # locks page scrolling to prevent jump to top of the page on refresh
   @scrollLock: (opts = {}) ->
-    node = opts.node || Pjax.node()
-    node.style.minHeight = node.scrollHeight + 'px'
-    setTimeout ->
-      node.style.minHeight = 'auto'
-      opts.func() if opts.func
-    , opts.delay || 10
+    scrollPosition = window.pageYOffset
+    body = document.body
+    body.style.height = window.getComputedStyle(body).height
+    window.scrollTo(0, scrollPosition) # Forces exact position
+
+    window.requestAnimationFrame =>
+      body.style.height = ''
+      window.scrollTo(0, scrollPosition) # Forces exact position again
 
   # prevert page flicker on refresh by fixing main node height
   @setPageBody: (node, href) ->
@@ -333,6 +335,17 @@ window.Pjax = class Pjax
   load: ->
     return false unless @href
 
+    # if Pjax.lastHref == @href && Pjax.lastTime && (new Date() - 1000) > Pjax.lastTime
+    #   LOG 'skipped'
+    #   return
+    # else if Pjax.lastTime
+    #   console.log Pjax.lastHref == @href, (new Date() - 1000) > Pjax.lastTime
+    # else
+    #   console.log 'lt', Pjax.lastTime
+
+    # Pjax.lastTime = new Date()
+    Pjax.lastHref = @href
+
     # if ctrl or cmd button is pressed, open in new window
     if event && !event.key && (event.which == 2 || event.metaKey)
       return window.open @href
@@ -340,8 +353,15 @@ window.Pjax = class Pjax
     if Pjax.before(@href, @opts) == false
       return
 
-    if @href == '#' || (location.hash && location.pathname == @href)
+    if (location.hash && location.pathname == @href)
       return
+
+    # handle %a{ href: '#top' } go to top
+    if @href.startsWith('#')
+      return if @href == '#'
+      if node = document.querySelector("a[name=#{@href.replace('#', '')}]")
+        node.scrollIntoView({behavior: 'smooth', block: 'start'});
+        return false
 
     if /^http/.test(@href) || /#/.test(@href) || @is_disabled
       return @redirect()
@@ -398,6 +418,8 @@ window.Pjax = class Pjax
           # scroll to top of the page unless defined otherwise
           unless @opts.scroll == false || Pjax.noScrollCheck(@opts.node)
             window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+          else
+            Pjax.scrollLock()
         else
           # document.write @response is buggy and unsafe
           # do full reload
@@ -427,7 +449,7 @@ window.Pjax = class Pjax
       if id = @opts.target.getAttribute('id')
         rtarget = @rroot.querySelector('#'+id)
         if rtarget
-          Pjax.scrollLock node: @opts.target
+          Pjax.scrollLock()
           @opts.target.innerHTML = rtarget.innerHTML
           return true
       else
@@ -449,8 +471,6 @@ window.Pjax = class Pjax
 
   # add current page to history
   historyAddCurrent: (href) ->
-    Pjax.lastHref = href
-
     return if @opts.history == false || (@opts.ajax_node && ! @opts.target)
     return if @history_added; @history_added = true
 
@@ -473,60 +493,66 @@ window.onpopstate = (event) ->
       Pjax.load path, history: false
 
 PjaxOnClick =
-  main: ->
+  main: (event) ->
     # self or scoped href, as on %tr row element.
-    if node = event.target.closest('*[href]')
+    # if you do not want parent onclick to trigger when using href, use "click" attribute on parent
+    # %tr{ click: ""... }
+    #   %td{ href: "/..." }
+    if node = event.target.closest('*[click], *[href]')
       event.stopPropagation()
       event.preventDefault()
 
-      href = node.getAttribute 'href'
+      if click = node.getAttribute('click')
+        (new Function(click)).bind(node)()
+      else
+        href = node.getAttribute 'href'
 
-      # to make it work onmouse dowm
-      # node.onclick = () => false
+        # to make it work onmouse dowm
+        # node.onclick = () => false
 
-      # %a{ href: '...' hx-target: "#some-id" } -> will refresh target element, if one found
-      if hxTarget = node.getAttribute('hx-target')
-        if hxNode = document.querySelectorAll(hxTarget)[0]
-          Pjax.load href, target: hxNode
-          return
+        # %a{ href: '...' hx-target: "#some-id" } -> will refresh target element, if one found
+        if hxTarget = node.getAttribute('hx-target')
+          if hxNode = document.querySelectorAll(hxTarget)[0]
+            Pjax.load href, target: hxNode
+            return
 
-      if href.slice(0, 2) == '//'
-        href = href.replace '/', ''
-        return window.open href
+        if href.slice(0, 2) == '//'
+          href = href.replace '/', ''
+          return window.open href
 
-      # if ctrl or cmd button is pressed, open in new window
-      if event.which == 2 || event.metaKey
-        return window.open href
+        # if ctrl or cmd button is pressed, open in new window
+        if event.which == 2 || event.metaKey
+          return window.open href
 
-      # if direct link, do not use Pjax
-      klass = ' ' + node.className + ' '
-      for el in Pjax.config.no_pjax_class
-        if klass.includes(" #{el} ")
-          if /^http/.test(href)
-            window.open(href)
-          else
-            return window.location.href = href
+        # if direct link, do not use Pjax
+        klass = ' ' + node.className + ' '
+        for el in Pjax.config.no_pjax_class
+          if klass.includes(" #{el} ")
+            if /^http/.test(href)
+              window.open(href)
+            else
+              return window.location.href = href
 
-      # execute inline JS
-      if /^javascript:/.test(href)
-        func = new Function href.replace(/^javascript:/, '')
-        return func()
+        # execute inline JS
+        if /^javascript:/.test(href)
+          func = new Function href.replace(/^javascript:/, '')
+          return func()
 
-      # disable bots
-      # return if /bot|googlebot|crawler|spider|robot|crawling/i.test(navigator.userAgent)
+        # disable bots
+        # return if /bot|googlebot|crawler|spider|robot|crawling/i.test(navigator.userAgent)
 
-      # if target attribute provided, open in new window
-      if /^\w/.test(href) || node.getAttribute('target')
-        return window.open(href, node.getAttribute('target') || href.replace(/[^\w]/g, ''))
+        # if target attribute provided, open in new window
+        if /^\w/.test(href) || node.getAttribute('target')
+          return window.open(href, node.getAttribute('target') || href.replace(/[^\w]/g, ''))
 
-      # if double slash start
-      if /^\/\//.test(href)
-        return window.open(window.location.origin + href.replace('/', ''), node.getAttribute('target') || href.replace(/[^\w]/g, ''))
+        # if double slash start
+        if /^\/\//.test(href)
+          return window.open(window.location.origin + href.replace('/', ''), node.getAttribute('target') || href.replace(/[^\w]/g, ''))
 
-      # if everything else fails, call Pjax
-      Pjax.load href, ajax: node
+        # if everything else fails, call Pjax
+        Pjax.load href, ajax: node
 
-      false
+        false
 
 window.addEventListener 'DOMContentLoaded', () ->
   setTimeout(Pjax.sendGlobalEvent, 0)

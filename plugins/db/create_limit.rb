@@ -35,8 +35,12 @@ module Sequel::Plugins::LuxCreateLimit
       # return if object exists
       return if self[:id]
 
+      return unless db_schema[:created_by] || db_schema[:created_by_ref]
+
       if data = cattr.create_limit_data
-        raise Lux::Error.unauthorized('You need to log in to save') unless ::User.try(:current)
+        unless ::User.try(:current)
+          raise Lux::Error.unauthorized('You need to log in to save')
+        end
 
         max_count, sec_or_field, name = *data
 

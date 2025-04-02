@@ -18,10 +18,17 @@ def load_file file, external: false
     Lux.info info
   elsif external
     Lux.info info
-    Lux.run "bundle exec lux e #{file}"
+    Lux.run "DB_MIGRATE=false bundle exec lux e #{file}"
   else
     Lux.info info
     load file
+  end
+end
+
+def dev_check!
+  unless Lux.env.dev?
+    print "Sure do DROP DB (Lux ENV: #{Lux.env})? (y/N): "
+    exit unless STDIN.gets.chomp.downcase == 'y'
   end
 end
 
@@ -41,6 +48,8 @@ namespace :db do
 
   desc 'Restore database backups'
   task :restore, [:name] => :env do |_, args|
+    dev_check!
+
     invoke 'db:drop'
 
     for db in Lux.config.sequel_dbs
@@ -50,16 +59,10 @@ namespace :db do
     end
   end
 
-  desc 'Reset and seed databases (db/seed.rb)'
-  task :reset, [:fast] do |_, args|
-    invoke 'db:drop'
-    run 'rake db:am'
-    run 'rake db:am'
-    run 'rake db:seed'
-  end
-
   desc 'Drop databases'
   task :drop do
+    dev_check!
+
     for db in Lux.config.sequel_dbs
       db.disconnect
       Lux.run "dropdb %s" % db.opts[:database]
@@ -71,7 +74,7 @@ namespace :db do
   task :test do
     for db in Lux.config.sequel_dbs
       db_name = db.opts[:database]
-      test_db_name = db_name + '_tmp'
+      test_db_name = db_name + '_test'
       db.run 'drop database if exists %s' % test_db_name
       db.run 'create database %s template %s' % [test_db_name, db_name]
       puts "Prepared #{test_db_name}"
@@ -80,6 +83,8 @@ namespace :db do
 
   desc 'Load seed from ./db/seeds '
   task :seed do
+    dev_check!
+
     for db in Lux.config.sequel_dbs
       db.disconnect
     end
@@ -87,12 +92,15 @@ namespace :db do
     run 'rake db:drop'
     run 'rake db:am'
 
-    # load_file './db/seeds.rb' do
-    #   for file in Dir['db/seeds/*'].sort
-    #     puts 'Seed: %s' % file.green
-    #     load file
-    #   end
-    # end
+    require './config/app'
+
+    load_file './db/seed.rb' do
+      for file in Dir['db/seeds/*'].sort
+        puts 'Seed: %s' % file.green
+        # Lux.run "bundle exec lux e #{file}"
+        load file
+      end
+    end
   end
 
   # rake db:gen_seeds[site]

@@ -13,18 +13,31 @@ class Sequel::Model
       super
     end
 
+    def take id
+      find id
+    rescue
+      nil
+    end
+
     # find will cache all finds in a scope
     def find id
       key = "#{to_s}/#{id}"
-      hash = id.is_numeric? ? {id: id} : {ref: id}
+      hash = db_schema[:ref] ? {ref: id} : {id: id}
+
+      raise "id/ref not given for #{self}" unless id.present?
 
       Lux.current.cache key do
+        row =
         if cattr.cache_ttl
           Lux.cache.fetch(key, ttl: cattr.cache_ttl) do
             self.first hash
           end
         else
           self.first hash
+        end
+
+        row || begin
+          raise(%[Record "#{id}" not found in #{to_s}])
         end
       end
     end

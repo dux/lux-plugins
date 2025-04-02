@@ -1,11 +1,15 @@
 # lnk models AR style
 
 module Sequel::Plugins::LuxLinks
-  LUX_REF_CACHE_CLEAR ||= {}
+  # LUX_REF_CACHE_CLEAR ||= {}
 
   module ClassMethods
-    def ref name, opts = {}
+    def ref name = :_nil, opts = {}
       opts = opts.to_hwia :class, :field, :cache
+
+      if name == :_nil
+        return ('%s_ref' % self.to_s.underscore).to_sym
+      end
 
       if name.class != Symbol
         # OrgUser.ref(@org) - @org_user.org_ref = @org.ref
@@ -28,6 +32,10 @@ module Sequel::Plugins::LuxLinks
             def #{name}
               #{klass}.find(#{field})
             end
+
+            def #{name}= object
+              self[:#{name}_ref] = object.ref
+            end
           STR
         else
           field = "#{name.to_s.singularize}_refs".to_sym
@@ -40,19 +48,20 @@ module Sequel::Plugins::LuxLinks
               end
             STR
           else
-            host = name.classify.constantize
-            LUX_REF_CACHE_CLEAR[host.to_s] ||= []
-            LUX_REF_CACHE_CLEAR[host.to_s].push to_s.underscore
+            host = klass.constantize
+            # LUX_REF_CACHE_CLEAR[host.to_s] ||= []
+            # LUX_REF_CACHE_CLEAR[host.to_s].push to_s.underscore
 
             # filed = host.respond_to?("#{self.to_s.underscore}_ref") : "#{self.to_s.underscore}_ref" : :parent_ref
 
             # Org.ref :projects -> @org.projects
-            action_field = "#{self.to_s.underscore}_ref".to_sym
+            action_field = opts[:field] || "#{self.to_s.underscore}_ref".to_sym
             action =
             if host.db_schema[action_field]
               "#{klass}.default.where(#{action_field}: ref)"
             else
-              "#{klass}.default.where(parent_ref: key)"
+              key = host.db_schema[:parent_key] ? :parent_key : :parent_ref
+              "#{klass}.default.where(#{key}: key)"
             end
             # ap [to_s, name, action_field, action].join(' - ')
             class_eval <<-STR, __FILE__, __LINE__ + 1
@@ -153,60 +162,49 @@ module Sequel::Plugins::LuxLinks
     end
   end
 
-  module InstanceMethods
-    def after_create
-      _lux_refs_update_counts
-      super
-    end
+#   module InstanceMethods
+#     def after_change
+#       _lux_refs_clear_cache
+#       super
+#     end
 
-    def after_save
-      _lux_refs_clear_cache
-      super
-    end
+#     def _lux_refs_clear_cache
+#       for o in (LUX_REF_CACHE_CLEAR[self.class.to_s] || [])
+#         if respond_to?(o)
+#           # clears cache in linked objects
+#           # Project.ref :tasks
+#           # @task.update -> Lux.cache.delete(@task.project.key/tasks)
+#           # project.update tasks_count: project.tasks.count
+#           target = send(o)
+#           key = [target.key, self.class.to_s.underscore.pluralize].join('/')
+#           Lux.cache.delete key
+#         end
+#       end
+#     end
 
-    def after_destroy
-      _lux_refs_clear_cache
-      _lux_refs_update_counts
-      super
-    end
+#     # def _lux_refs_update_counts
+#     #   if respond_to?(:parent_key)
+#     #     plural = self.class.to_s.tableize
+#     #     count_field = "#{plural}_count"
+#     #     if parent.respond_to?(count_field) && parent.respond_to?(plural)
+#     #       parent.this.update count_field => parent.send(plural).count
+#     #     end
+#     #   end
 
-    def _lux_refs_clear_cache
-      for o in (LUX_REF_CACHE_CLEAR[self.class.to_s] || [])
-        if respond_to?(o)
-          # clears cache in linked objects
-          # Project.ref :tasks
-          # @task.update -> Lux.cache.delete(@task.project.cache_key/tasks)
-          # project.update tasks_count: project.tasks.count
-          target = send(o)
-          key = [target.key, self.class.to_s.underscore.pluralize].join('/')
-          Lux.cache.delete key
-        end
-      end
-    end
-
-    def _lux_refs_update_counts
-      if respond_to?(:parent_key)
-        plural = self.class.to_s.tableize
-        count_field = "#{plural}_count"
-        if parent.respond_to?(count_field) && parent.respond_to?(plural)
-          parent.this.update count_field => parent.send(plural).count
-        end
-      end
-
-      for o in (LUX_REF_CACHE_CLEAR[self.class.to_s] || [])
-        if respond_to?(o)
-          # update counts
-          # Project.ref :tasks -> update @project.tasks_count when task changes (if exists)
-          target = send(o)
-          plural = self.class.to_s.tableize
-          count_key = "#{plural}_count"
-          if target.respond_to?(count_key)
-            target.this.update count_key => target.send(plural).count
-          end
-        end
-      end
-    end
-  end
+#     #   for o in (LUX_REF_CACHE_CLEAR[self.class.to_s] || [])
+#     #     if respond_to?(o)
+#     #       # update counts
+#     #       # Project.ref :tasks -> update @project.tasks_count when task changes (if exists)
+#     #       target = send(o)
+#     #       plural = self.class.to_s.tableize
+#     #       count_key = "#{plural}_count"
+#     #       if target.respond_to?(count_key)
+#     #         target.this.update count_key => target.send(plural).count
+#     #       end
+#     #     end
+#     #   end
+#     # end
+#   end
 end
 
 # Sequel::Model.plugin :lux_links

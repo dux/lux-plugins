@@ -39,7 +39,7 @@ styles = []
 points = ['mobile', 'table', 'desktop']
 for el in points
   styles.push """
-    .#{el}-show, .#{el}-inline, .#{el}-full, .#{el}-center { display: none !important; }
+    .#{el}-show, .#{el}-inline, .#{el}-full { display: none !important; }
     body.#{el} {
       .#{el}-show { display: block !important; }
       .#{el}-inline { display: inline-block !important; }

@@ -3,11 +3,11 @@
 
 require 'logger'
 
-logger = Lux.logger(:postgres)
-
+logger = Logger.new STDOUT
 logger.formatter = proc do |severity, datetime, progname, msg|
   elms = msg.split(/\(|s\)\s/, 3)
   time = (elms[1].to_f * 1000).round(1)
+  formated = " DB: #{elms[2].to_s.cyan} (#{time} ms, #{Lux.app_caller})"
 
   if c = Thread.current[:db_q]
     if c && c[:last] != msg
@@ -15,23 +15,19 @@ logger.formatter = proc do |severity, datetime, progname, msg|
       c[:time] += elms[1].to_f
       c[:cnt]  += 1
 
-      if Lux.current.request.params[:sql] == 'true'
-        require 'niceql'
-        puts '- %sms - %s' % [(elms[1].to_f * 1000).round(1), Lux.app_caller]
-        puts Niceql::Prettifier.prettify_sql elms[2]
-        puts
-      else
-        Lux.log do
-          line  = " #{c[:cnt].to_s.rjust(2)}. #{time} : #{elms[2].to_s.cyan}"
-          line += " -- #{Lux.app_caller}" if Lux.current.no_cache?
-          line
-        end
-      end
+      # if true || Lux.current.request.params[:sql] == 'true'
+      #   require 'niceql'
+      #   puts 'DB: %sms - %s' % [(elms[1].to_f * 1000).round(1), Lux.app_caller]
+      #   puts Niceql::Prettifier.prettify_sql elms[2]
+      #   puts
+      # else
+        Lux.log formated
+      # end
     end
   else
     if ENV['DB_LOG'] || (!Lux.env.rake? && !msg.include?('SELECT "pg_attribute"."attname"') && !msg.end_with?('SELECT NULL'))
       $last_sql_command = msg
-      Lux.log (' DB: (%s ms) %s' % [time, msg.split('s) ', 2)[1]]).cyan
+      Lux.log formated
     end
   end
 end
@@ -40,8 +36,6 @@ if ENV['RAKE_ENV'] != 'test' || ENV['DB_LOG'] == 'true'
   # error logger to stdout
   Lux.config.sequel_dbs = [] unless Lux.config[:sequel_dbs]
   Lux.config.sequel_dbs.each do |db|
-    logger = Logger.new STDOUT
-    logger.level = :error
     db.loggers << logger
   end
 

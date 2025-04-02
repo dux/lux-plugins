@@ -86,6 +86,7 @@ loadResource = (src, type) ->
         node = document.createElement('script')
         node.id    = id
         node.async = 'async'
+        node.crossOrigin = 'anonymous'
         node.src   = src
         node.type = 'module' if type == 'module'
         document.getElementsByTagName('head')[0].appendChild node
@@ -442,6 +443,13 @@ $.cookies =
 # copies text to clipboard
 $.copyText = (str) ->
   # node? pass refrence to table, to copy table
+  if typeof str == 'function'
+    if window.navigator
+      navigator.clipboard.readText().then(str)
+    else
+      console.error 'You are not on localhost of HTTPS'
+    return
+
   if typeof str != 'string'
     str = $(str)[0].innerText.trim()
 
@@ -503,6 +511,7 @@ $.scrollToBottom = (goNow) ->
 $.random = (list) ->
   list[Math.floor(Math.random() * list.length)]
 
+# top bar save info
 $.saveInfo = () ->
   data = """<div id="loader-bar">
     <style>
@@ -551,23 +560,27 @@ $.times = (num, func) ->
 # node functions
 
 # https://svelte.dev/repl/225254b125754b7782534670815cde27
-$.fn.animateInsert = (text) ->
-  node = @[0]
+$.fn.animateInsert = (html) ->
+  if node = @[0]
+    html = node.innerHTML if html == undefined
 
-  # if we want to animate reduction of text, we need tmp node
-  node.style.transition ||= 'all .3s ease-out';
-  node.style.overflow = 'hidden'
-  node.style.height ||= '0px'
+    node.style.transition ||= 'all .3s ease-out';
+    node.style.overflow = 'hidden'
+    node.style.height ||= 'auto'
 
-  test = document.createElement('div')
-  test.style.height = '0px'
-  test.innerHTML = text
-  node.insertAdjacentElement('afterend', test)
-  node.innerHTML = text
+    if node.oldHtmlCache != html
+      node.oldHtmlCache = html
 
-  window.requestAnimationFrame ->
-    node.style.height = test.scrollHeight + 'px'
-    test.parentNode.removeChild(test)
+      # if we want to animate reduction of html, we need tmp node
+      test = document.createElement('div')
+      test.style.height = '0px'
+      test.innerHTML = html
+      node.insertAdjacentElement('afterend', test)
+      node.innerHTML = html
+
+      window.requestAnimationFrame ->
+        node.style.height = test.scrollHeight + 'px'
+        test.parentNode.removeChild(test)
 
 $.fn.slideDown = (duration) ->
   @show()
@@ -640,13 +653,14 @@ $.fn.xfirst = (func) ->
 # better focus, cursor at the end of the input
 # $('input[name=q]').xfocus()
 $.fn.xfocus = ->
-  $.delay =>
+  setTimeout =>
     $(this).xfirst (el) ->
       value = undefined
       value = el.val()
       el.focus()
       el.val value + ' '
       el.val value
+    , 10
 
 # load URL and replace content under specific ID
 # executes scripts found in a page
@@ -703,25 +717,25 @@ $.fn.ajax = (path, path_state) ->
   node = if @hasClass('ajax') then @ else @parents('.ajax')
   id = @attr('id')
 
-  if node[0]
+  if id && node[0]
     path ||= @attr('path') || @attr('data-path')
     path ||= location.pathname + String(location.search)
     node.attr('data-path', path) if path
 
     $.get path, (data) =>
-      html = if id
-        $("<div>#{data}</div>").find("##{id}").html() || data
-      else
-       data
-
+      html = $("<div>#{data}</div>").find("##{id}").html() if id
+      html ||= data
       node.html html
 
-    # set new path state, so back can work in browsers
-    if path_state
-      if path_state[0] == '?'
-        path_state = location.pathname + path_state
+  else
+    $.get path, (data) => @.html(data)
 
-      window.history.pushState({ title: document.title }, document.title, path_state)
+  # set new path state, so back can work in browsers
+  if path_state
+    if path_state[0] == '?'
+      path_state = location.pathname + path_state
+
+    window.history.pushState({ title: document.title }, document.title, path_state)
 
 $.fn.shake = (interval = 150) ->
   @addClass 'shaking'
@@ -773,6 +787,9 @@ $.fn.activate = (klass = 'active') ->
     $(target.parentNode).find('& > *').removeClass klass
     $(target).addClass klass
 
+# $.fn.onDestroy = ->
+#   for n in @
+
 
 # simple pub sub, node aware. when node is removed, no sub trigger
 # global publish, and global + node subscribe
@@ -795,12 +812,13 @@ $.sub = (name, func) ->
   null
 
 $.fn.sub = (name, func) ->
-  unless this[0].nodeName
-    console.error 'Not a DOM node given for sub', this[0]
+  if this[0]
+    unless this[0].nodeName
+      console.error 'Not a DOM node given for sub', this[0]
 
-  PUB_SUB[name] ||= []
-  PUB_SUB[name].push({n: this[0], f: func})
-  @
+    PUB_SUB[name] ||= []
+    PUB_SUB[name].push({n: this[0], f: func})
+    @
 
 window.escapeHTML = (text) ->
   text
@@ -808,3 +826,30 @@ window.escapeHTML = (text) ->
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+
+# drag and pan horizontally scrollable block
+$.fn.pannableBlock = ->
+  @each ->
+    el = $(@)
+    isDown = false
+    startX = null
+    scrollLeft = null
+
+    el.on 'mousedown', (e) ->
+      isDown = true
+      startX = e.pageX - el.offset().left
+      scrollLeft = el.scrollLeft()
+      el.css 'cursor', 'move'
+
+    el.on 'mousemove', (e) ->
+      return unless isDown
+      e.preventDefault()
+      x = e.pageX - el.offset().left
+      walk = (x - startX) * 1
+      el.scrollLeft(scrollLeft - walk)
+      document.body.classList.add 'no-select'
+
+    $(document).on 'mouseup', ->
+      isDown = false
+      el.css 'cursor', 'default'
+      document.body.classList.remove 'no-select'

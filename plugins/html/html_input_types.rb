@@ -118,11 +118,16 @@ class HtmlInput
     @opts.delete(:value) if ['0', 'false', 'off'].include?(@opts[:value].to_s)
     id = Lux.current.uid
     # let this be 1 or 0, fix other code if problems
-    hidden = { :name=>@opts.delete(:name), :type=>:hidden, :value=>@opts[:value] ? 1 : 0, :id=>id }
+    hidden = {
+      name: @opts.delete(:name),
+      type: :hidden,
+      value: @opts[:value] ? 1 : 0,
+      id: id
+    }
     @opts[:type] = :checkbox
     @opts[:onclick] = "document.getElementById('#{id}').value=this.checked ? 1 : 0; #{@opts[:onclick]}"
-    @opts[:checked] = 1 if @opts.delete(:value)
-    @opts.tag(:input)+hidden.tag(:input)
+    @opts[:checked] = 'true' if @opts.delete(:value).is_true?
+    @opts.tag(:input) + hidden.tag(:input)
   end
 
   def as_checkboxes

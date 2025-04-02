@@ -72,7 +72,7 @@ class AutoMigrate
     unless self.db.table_exists?(@table_name.to_s)
       # http://sequel.jeremyevans.net/rdoc/files/doc/schema_modification_rdoc.html
 
-      DB.create_table(@table_name) do
+      self.db.create_table(@table_name) do
         if ENV['DB_USE_REF']
           String :ref, primary_key: true
         else
@@ -112,7 +112,7 @@ class AutoMigrate
   end
 
   def extension name
-    unless DB["SELECT extname FROM pg_extension where extname='#{name}'"].to_a.first
+    unless self.db["SELECT extname FROM pg_extension where extname='#{name}'"].to_a.first
       log_run 'CREATE EXTENSION %s' % name
     end
   end

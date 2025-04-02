@@ -10,7 +10,8 @@ namespace :assets do
     Lux.run 'npx rollup -c --compact' # --context window
 
     for css in Dir.files('app/assets').select { |it| it.ends_with?('.css') || it.ends_with?('.scss') }
-      Lux.run "npx node-sass app/assets/#{css} -o public/assets/ --output-style compressed"
+      # Lux.run "npx node-sass app/assets/#{css} -o public/assets/ --output-style compressed"
+      Lux.run "bun x sass app/assets/#{css} public/assets/#{css.sub('.scss', '.css')} -s compressed"
     end
 
     integrity = 'sha512'

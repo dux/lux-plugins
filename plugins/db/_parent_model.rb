@@ -1,50 +1,51 @@
-# parent_key
-# parent_type & parent_id
+# You put in model
+# * parent_key
+# * or parent_type + parent_id
+# @object.parent -> get parent
+# @object.parent= model -> set parent
+# Object.parent(@model) -> search Object
 
 module Sequel::Plugins::ParentModel
   module InstanceMethods
     # apply parent attributes
     def parent= model
       if db_schema[:parent_key]
-        if model.is_a?(String)
-          if model.include?('/')
-            self[:parent_key] = model
-          else
-            raise ArgumentErorr.new('Parent key is missing /')
-          end
+        self[:parent_key] =
+        if model.is_a?(String) && model.include?('/')
+          key
         else
-          self[:parent_key] = '%s/%s' % [model.class, model.id]
+          '%s/%s' % [model.class, model.id]
         end
       else
         self[:parent_type] = model.class.to_s
-        self[:parent_id] = model.id
+        self[respond_to?(:parent_ref) ? :parent_ref : :parent_id] = model.id
       end
+
+      @parent = model
     end
 
     # @board.parent -> @list
     def parent obj = nil
       if obj
-        if obj.respond_to?(:parent_key)
-          self.parent_key = obj.key
-        else
-          self.parent_ref = obj.ref
-          self.parent_type = obj.class.to_s
-        end
-
+        # OrgUser.new.parent(@org)
+        self.parent = obj
         self
-      elsif key = self[:parent_key]
-        key = key.split('/')
-        key[0].constantize.find(key[1])
-      elsif key = self[:parent_type]
-        key.constantize.find(self[:parent_id])
       else
-        raise ArgumentError, '%s parent key not found.' % self.class
+        @parent ||=
+        if key = self[:parent_key]
+          key = key.split('/')
+          key[0].constantize.find(key[1])
+        elsif key = self[:parent_type]
+          key.constantize.find(self[respond_to?(:parent_ref) ? :parent_ref : :parent_id])
+        else
+          raise ArgumentError, '%s parent key not found.' % self.class
+        end
       end
     end
 
     # check if parent is present
     def parent?
-      db_schema[:parent_key] || (db_schema[:parent_id] && db_schema[:parent_id])
+      db_schema[:parent_key] || db_schema[:parent_type]
     end
   end
 
@@ -53,8 +54,12 @@ module Sequel::Plugins::ParentModel
     def for_parent object
       if key = db_schema[:parent_key]
         where(parent_key: object.key)
-      elsif key = db_schema[:parent_type]
-        where(parent_id: object.id, parent_type: object.class.to_s)
+      elsif db_schema[:parent_type]
+        if db_schema[:parent_ref]
+          where(parent_ref: object.ref, parent_type: object.class.to_s)
+        else
+          where(parent_id: object.id, parent_type: object.class.to_s)
+        end
       else
         raise ArgumentError, 'parent key not found'
       end

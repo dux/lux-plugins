@@ -117,6 +117,13 @@ class Sequel::Model
   end
 
   module DatasetMethods
+    def refs cnt = nil
+      select(:ref).limit(cnt || 1000).all.map(&:ref)
+    end
+
+    def latest
+      order(Sequel.desc(:updated_at))
+    end
   end
 end
 

@@ -12,8 +12,8 @@ module Sequel::Plugins::LuxBeforeSave
       if self.id
         Lux.cache.delete "#{self.class}/#{id}"
       else
-        self[:created_by] = default_current_user if respond_to?(:created_by)
-        self[:created_by_ref] = default_current_user if respond_to?(:created_by_ref)
+        self[:created_by] ||= default_current_user if respond_to?(:created_by)
+        self[:created_by_ref] ||= default_current_user if respond_to?(:created_by_ref)
       end
 
       super
@@ -24,6 +24,19 @@ module Sequel::Plugins::LuxBeforeSave
       super
     end
 
+    def destroy
+      if respond_to?(:is_deleted)
+        opts = {is_deleted: true}
+        opts[:deleted_at] = Time.now if respond_to?(:deleted_at)
+        opts[:deleted_by] = User.current.id if respond_to?(:deleted_by)
+        opts[:deleted_by_ref] = User.current.ref if respond_to?(:deleted_by_ref)
+        self.this.update opts
+        true
+      else
+        super
+      end
+    end
+
     # overload to return guest user, when needed
     def default_current_user
       if User.current
@@ -32,6 +45,24 @@ module Sequel::Plugins::LuxBeforeSave
         error 'You have to be registered to save data'
         nil
       end
+    end
+  end
+
+  module DatasetMethods
+    def not_deleted
+      model.db_schema[:is_deleted] ? where(is_deleted: false) : self
+    end
+
+    def deleted
+      model.db_schema[:is_deleted] ? where(is_deleted: true) : self
+    end
+
+    def activated
+      model.db_schema[:is_active] ? where(is_active: true) : self
+    end
+
+    def not_activated
+      model.db_schema[:is_active] ? where(is_active: true) : self
     end
   end
 end
