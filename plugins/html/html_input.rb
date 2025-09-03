@@ -2,7 +2,7 @@
 # input.render :email, value: 'foo@bar.baz'
 
 class HtmlInput
-  attr_accessor :type
+  attr_accessor :type, :opts
 
   def initialize object=nil, opts={}
     if object.is_a?(Hash)
@@ -11,7 +11,7 @@ class HtmlInput
     end
 
     @object = object
-    @opts   = opts.dup
+    @opts   = opts
 
     @opts.delete :disabled if @opts[:disabled].to_s == 'false'
   end
@@ -22,20 +22,70 @@ class HtmlInput
 
   # .render :name          # @object.name
   # .render settings: :key # @object.settings[key]
-  def render name, opts={}
+  def render name, opts = {}
     @opts.merge! opts
+    @name = name
 
-    @name = if name.is_a?(Array)
-      # [:opts, :app, :posts] => model[opts][app][posts]
-      # @object[name.first.to_sym] ||= {}
-      @opts[:value] ||= @object.send(name.first.to_sym).dig(*name.drop(1).map(&:to_s)) if @object
-      @opts[:name]    = name.first.to_s + name.drop(1).map{ "[#{_1}]" }.join('')
-    else
-      @opts[:name] = name
+    @opts[:placeholder] ||= 'email...' if @name.to_s.include?('email')
+    @opts[:placeholder] ||= 'https://...' if @name.to_s.ends_with?('url')
+    @opts[:id]          ||= 'i_%s' % Lux.current.uid
+
+    if @object && @object.class.respond_to?(:schema) && [Symbol, Array].include?(@name.class)
+      schema = @object.class.schema || raise('Typero schema for object "%s" not found' % @object.class)
+
+      if db_type = @object.db_schema.dig(@name, :db_type)
+        @opts[:as] ||= :datetime if db_type.include?('timestamp')
+        @opts[:as] ||= :date     if db_type == 'date'
+        @opts[:as] ||= :memo     if db_type == 'text'
+        @opts[:as] ||= :checkbox if db_type == 'boolean'
+      end
+
+      if rules = schema.rules[@name]
+        for k, v in rules[:meta].or({})
+          v = @object.instance_exec &v if v.is_a?(Proc)
+          @opts[k] = v unless @opts.key?(k)
+        end
+      end
+
+      if @name.is_a?(Symbol) && @object.respond_to?(:db_schema) && !@opts[:as]
+        # @model.levels_sid -> collection: Models.levels
+        reg = /_s?id$/
+        if @name.to_s =~ reg
+          @name = @name.to_s.sub(reg, '')
+          if @object.class.respond_to?(@name)
+            @opts[:collection] = @object.class.send(@name)
+          end
+        end
+      end
+
+      # default value for as
+      @opts[:as]    ||= calculate_type
+      @opts[:id]    ||= Lux.current.uid
+      @opts[:value] ||= @object.send(@name) if @object && @name.is_a?(Symbol)
+      @opts[:value]   = @opts[:default] if @opts[:value].blank?
+
+      # convert decimal numbers to float
+      @opts[:value] = @opts[:value].to_f if @opts[:value].class == BigDecimal
+
+      @name = if name.is_a?(Array)
+        if @object.db_schema[name[0]][:db_type].include?('[]')
+          @opts[:value] = name[1].to_s
+          @object ? "[#{name[0]}][]" : "#{name[0]}[]"
+        else
+          # [:opts, :app, :posts] => model[opts][app][posts]
+          if @object
+            @opts[:value] ||= @object.send(name.first.to_sym).dig(*name.drop(1).map(&:to_s))
+            name.first.to_s + name.drop(1).map{ "[#{_1}]" }.join('')
+          else
+            raise 'not implemented'
+          end
+        end
+      elsif @object && name.class == Symbol
+        '%s[%s]' % [@object.class.to_s.tableize.singularize, name]
+      end
     end
 
-    opts_prepare
-
+    @opts[:name] = @name
     @type = @opts.delete(:as) || :text
 
     send("as_#{@type}")
@@ -82,32 +132,6 @@ class HtmlInput
     else
       return :string
     end
-  end
-
-  # exports @name and @opts globals
-  def opts_prepare
-    # default value for as
-    @opts[:as]    ||= calculate_type
-    @opts[:id]    ||= Lux.current.uid
-    @opts[:value] ||= @object.send(@name) if @object && @name.is_a?(Symbol)
-    @opts[:value]   = @opts[:default] if @opts[:value].blank?
-
-    @name = if @object
-      '%s[%s]' % [@object.class.name.underscore, @name]
-    else
-      @name
-    end
-
-    if @name.to_s.include?('[')
-      parts = @name.split(/([\[\]])+/).select{|k| k =~ /^(\w)/}
-      @name = parts.shift
-      @name += parts.map{|el| "[#{el}]" }.join('')
-    end
-
-    @opts[:name] = @name
-
-    # convert decimal numbers to float
-    @opts[:value] = @opts[:value].to_f if @opts[:value].class == BigDecimal
   end
 
   # prepare collection for radios and selects

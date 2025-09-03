@@ -21,6 +21,8 @@ class Sequel::Model
 
     # find will cache all finds in a scope
     def find id
+      return unless id.present?
+
       key = "#{to_s}/#{id}"
       hash = db_schema[:ref] ? {ref: id} : {id: id}
 

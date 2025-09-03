@@ -14,15 +14,7 @@ logger.formatter = proc do |severity, datetime, progname, msg|
       c[:last] = msg
       c[:time] += elms[1].to_f
       c[:cnt]  += 1
-
-      # if true || Lux.current.request.params[:sql] == 'true'
-      #   require 'niceql'
-      #   puts 'DB: %sms - %s' % [(elms[1].to_f * 1000).round(1), Lux.app_caller]
-      #   puts Niceql::Prettifier.prettify_sql elms[2]
-      #   puts
-      # else
-        Lux.log formated
-      # end
+      Lux.log formated
     end
   else
     if ENV['DB_LOG'] || (!Lux.env.rake? && !msg.include?('SELECT "pg_attribute"."attname"') && !msg.end_with?('SELECT NULL'))

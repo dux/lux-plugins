@@ -92,6 +92,10 @@ window.Pjax = class Pjax
 
     @fetch(opts)
 
+  @refreshed: ->
+    return false unless @pastHref
+    @pastHref == @lastHref
+
   # reload, jump to top, no_cache http request forced
   @reload: (opts) ->
     opts = @getOpts opts
@@ -249,7 +253,6 @@ window.Pjax = class Pjax
     @lastHref || @path()
 
   @sendGlobalEvent: ->
-    document.dispatchEvent new Event('DOMContentLoaded')
     document.dispatchEvent new CustomEvent('pjax:render')
 
   @pushState: (href) ->
@@ -344,6 +347,7 @@ window.Pjax = class Pjax
     #   console.log 'lt', Pjax.lastTime
 
     # Pjax.lastTime = new Date()
+    Pjax.pastHref = Pjax.lastHref
     Pjax.lastHref = @href
 
     # if ctrl or cmd button is pressed, open in new window
@@ -565,3 +569,4 @@ window.addEventListener 'DOMContentLoaded', () ->
       e.preventDefault()
       target = if is_pjax == 'true' then null else target
       Pjax.load form.getAttribute('action'), form: form, target: target
+  , once: true

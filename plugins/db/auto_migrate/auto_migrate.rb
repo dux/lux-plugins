@@ -364,7 +364,7 @@ class AutoMigrate
     name = args[0]
     opts = args[1] || {}
 
-    if [:string, :integer, :text, :boolean, :datetime, :date, :geography, :timestamp].index(type)
+    if [:string, :integer, :text, :boolean, :datetime, :date, :geography, :timestamp, :bytea].index(type)
       @fields[name.to_sym] = [type, opts]
     elsif type == :jsonb
       opts[:default] = {}

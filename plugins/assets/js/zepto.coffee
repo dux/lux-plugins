@@ -605,17 +605,17 @@ $.fn.slideToggle = (duration) ->
 
 # https://svelte.dev/repl/4edf94c1d3f24fb0a7d86670f194cefb
 $.fn.toggleMaxHeight = ->
-  node = @[0]
-  node.style.transition ||= "max-height 0.2s ease-out"
-  node.style.overflow = 'hidden'
+  if node = @[0]
+    node.style.transition ||= "max-height 0.2s ease-out"
+    node.style.overflow = 'hidden'
 
-  window.requestAnimationFrame =>
-    if @css('max-height') == '0px'
-      @addClass 'is-open'
-      node.style.maxHeight = "#{node.scrollHeight}px"
-    else
-      @removeClass 'is-open'
-      node.style.maxHeight = '0px'
+    window.requestAnimationFrame =>
+      if @css('max-height') == '0px'
+        @addClass 'is-open'
+        node.style.maxHeight = "#{node.scrollHeight}px"
+      else
+        @removeClass 'is-open'
+        node.style.maxHeight = '0px'
 
 # $('form#foo').serializeHash()
 $.fn.serializeHash = ->

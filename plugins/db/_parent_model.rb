@@ -6,6 +6,16 @@
 # Object.parent(@model) -> search Object
 
 module Sequel::Plugins::ParentModel
+  module DatasetMethods
+    def where_parent object
+      if model.db_schema[:parent_key]
+        where(parent_key: object.key)
+      else
+        where(parent_type: object.class.to_s, parent_ref: object.ref)
+      end
+    end
+  end
+
   module InstanceMethods
     # apply parent attributes
     def parent= model

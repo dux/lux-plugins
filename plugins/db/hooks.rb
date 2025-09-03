@@ -25,6 +25,7 @@ module Sequel::Plugins::LuxHooks
 
     def after_create
       before_update_exec :a, :c
+      after_change
       super
     end
 
@@ -36,6 +37,18 @@ module Sequel::Plugins::LuxHooks
     def after_update
       before_update_exec :a, :u
       after_change
+      super
+    end
+
+    def before_save
+      before_update_exec :b, :c
+      before_update_exec :b, :u
+      super
+    end
+
+    def after_save
+      before_update_exec :a, :c
+      before_update_exec :a, :u
       super
     end
 
@@ -61,6 +74,8 @@ module Sequel::Plugins::LuxHooks
       :after_create,
       :before_update,
       :after_update,
+      :before_save,
+      :after_save,
       :before_destroy,
       :after_destroy,
       :after_change

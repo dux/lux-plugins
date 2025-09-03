@@ -33,7 +33,7 @@ window.MediaBodyClass =
     document.body.classList.contains('mobile')
 
 addEventListener "resize", MediaBodyClass.init
-addEventListener 'DOMContentLoaded', MediaBodyClass.init
+addEventListener 'DOMContentLoaded', MediaBodyClass.init, once: true
 
 styles = []
 points = ['mobile', 'table', 'desktop']
