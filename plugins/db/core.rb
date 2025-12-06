@@ -114,6 +114,13 @@ class Sequel::Model
         send m, val if respond_to?(m)
       end
     end
+
+    # on_change :ord do |prev_val, next_val| ...
+    def on_change field
+      if column_changed?(field)
+        yield *column_change(field)
+      end
+    end
   end
 
   module DatasetMethods

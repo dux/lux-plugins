@@ -679,11 +679,7 @@ $.fn.reload = (path, func) ->
   ajax_node = @parents('.ajax').first()
   ajax_node = @ unless ajax_node[0]
 
-  path  ||= ajax_node.attr('data-path') || ajax_node.attr('path')
-
-  unless path
-    alert 'Ajax path not found'
-    return
+  path  ||= ajax_node.attr('data-path') || ajax_node.attr('path') || location.pathname + location.hash
 
   node_id = ajax_node.attr('id')
   ajax_node.attr('path', path)

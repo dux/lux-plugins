@@ -66,7 +66,7 @@ class HtmlTable
 
     prepare_as_blocks
 
-    HtmlTag.div(class: :table) do |n|
+    HtmlTag.div(class: 'app-table') do |n|
       n.table(class: @opts[:class], 'data-fields': @cols.map{ |o| }) do |n|
         n.thead do |n|
           n.tr do |n|

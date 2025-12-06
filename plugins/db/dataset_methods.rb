@@ -109,35 +109,22 @@ Sequel::Model.dataset_module do
 
   def for obj
     # column_names
-    field_name = "#{obj.class.name.underscore}_id".to_sym
-    n1         = model.to_s.underscore
-    n2         = obj.class.to_s.underscore
+    field_name = "#{obj.class.name.underscore}_ref".to_sym
+    n1 = model.to_s.underscore
+    n2 = obj.class.to_s.underscore
 
     cname = n1[0] < n2[0] ? n1+'_'+n2.pluralize : n2+'_'+n1.pluralize
 
     if (cname.classify.constantize rescue false)
       where Sequel.lit 'id in (select %s_id from %s where %s_id=%i)' % [n1, cname, n2, obj.id]
     elsif model.db_schema[field_name]
-      where Sequel.lit '%s=%i' % [field_name, obj.id]
-    elsif model.db_schema["#{n2}_ids".to_sym]
-      where Sequel.lit '%i=any(%s_ids)' % [obj.id, n2]
+      where field_name => obj.ref
     elsif model.db_schema["#{n2}_refs".to_sym]
       where Sequel.lit '%i=any(%s_refs)' % [obj.ref, n2]
     elsif model.db_schema[:parent_key]
       where(parent_key: obj.key)
-    elsif model.db_schema[:model_type]
-      # should use parent_id and for_parent(@object)
-      if model.db_schema[:model_ref]
-        where(model_type: obj.class.to_s, model_ref: obj.ref)
-      else
-        where(model_type: obj.class.to_s, model_id: obj.id)
-      end
-    elsif obj.class.to_s == 'User'
-      if obj.respond_to?(field_name)
-        where Sequel.lit '%s=?' % [field_name, obj.id]
-      else
-        where Sequel.lit 'created_by=%i' % obj.id
-      end
+    elsif model.db_schema[:parent_type]
+      where(parent_type: obj.class.to_s, parent_ref: obj.ref)
     else
       r "Unknown link for #{obj.class} (probably missing db field)"
     end
@@ -161,9 +148,11 @@ Sequel::Model.dataset_module do
   def ids field = nil
     field ||= model.db_schema[:ref] ? :ref : :id
     sql = [:id, :ref].include?(field) ? select(field).sql : select(field).order(nil).distinct(field).sql
-    db[sql].to_a.map { |it| it[field] }.tap do |out|
-      out[0] ||= 0
-    end
+    db[sql].to_a.map { |it| it[field] }
+      .tap do |out|
+        type = model.db_schema[field][:db_type]
+        out[0] ||= type == 'text' || type.include?('varying') ? '0' : 0
+      end
   end
 
   def last num = nil

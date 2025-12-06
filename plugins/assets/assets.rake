@@ -3,7 +3,7 @@
 require 'digest'
 
 def import_css folder
-  Dir.find(folder, ext: [:css, :scss], invert: true) { '@use "%s";' }
+  Dir.find(folder, ext: [:css, :scss], invert: true) { '@import "%s";' }
 end
 
 def import_js folder
@@ -76,8 +76,10 @@ namespace :assets do
         if file.start_with?('/* ')
           data.push file
         else
-          code = file.split('/').last.split('.')[0].sub(/^\d+_?/, '')
-          data.push %[@use "#{file}" as #{code};]
+          code = code = 'sha1_' + Digest::SHA1.hexdigest(file)
+          # data.push %[@use "#{file}" as #{code};]
+          # data.push %[@use "#{file}" as *;]
+          data.push %[@import "#{file}";]
         end
       end
 

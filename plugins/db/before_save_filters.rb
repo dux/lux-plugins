@@ -50,19 +50,19 @@ module Sequel::Plugins::LuxBeforeSave
 
   module DatasetMethods
     def not_deleted
-      model.db_schema[:is_deleted] ? where(is_deleted: false) : self
+      model.db_schema[:is_deleted] ? xwhere("#{model.to_s.tableize}.is_deleted = false") : self
     end
 
     def deleted
-      model.db_schema[:is_deleted] ? where(is_deleted: true) : self
+      model.db_schema[:is_deleted] ? xwhere("#{model.to_s.tableize}.is_deleted = true") : self
     end
 
     def activated
-      model.db_schema[:is_active] ? where(is_active: true) : self
+      model.db_schema[:is_active] ? xwhere("#{model.to_s.tableize}.is_active = true") : self
     end
 
-    def not_activated
-      model.db_schema[:is_active] ? where(is_active: true) : self
+    def deactivated
+      model.db_schema[:is_active] ? xwhere("#{model.to_s.tableize}.is_active = false") : self
     end
   end
 end

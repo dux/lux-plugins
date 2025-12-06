@@ -68,9 +68,10 @@ class HtmlInput
       @opts[:value] = @opts[:value].to_f if @opts[:value].class == BigDecimal
 
       @name = if name.is_a?(Array)
+        @filed_name = name[0]
         if @object.db_schema[name[0]][:db_type].include?('[]')
           @opts[:value] = name[1].to_s
-          @object ? "[#{name[0]}][]" : "#{name[0]}[]"
+          @object ? "#{@object.class.to_s.tableize.singularize}[#{name[0]}][]" : "#{name[0]}[]"
         else
           # [:opts, :app, :posts] => model[opts][app][posts]
           if @object

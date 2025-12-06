@@ -1,6 +1,6 @@
 # You put in model
 # * parent_key
-# * or parent_type + parent_id
+# * or parent_type + parent_id/parent_ref
 # @object.parent -> get parent
 # @object.parent= model -> set parent
 # Object.parent(@model) -> search Object

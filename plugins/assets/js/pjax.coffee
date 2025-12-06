@@ -92,15 +92,15 @@ window.Pjax = class Pjax
 
     @fetch(opts)
 
-  @refreshed: ->
-    return false unless @pastHref
-    @pastHref == @lastHref
-
   # reload, jump to top, no_cache http request forced
   @reload: (opts) ->
     opts = @getOpts opts
     opts.cache ||= false
     @fetch(opts)
+
+  @refreshed: ->
+    return false unless @pastHref
+    @pastHref == @lastHref
 
   # normalize options
   @getOpts = (path, opts) ->
@@ -262,6 +262,10 @@ window.Pjax = class Pjax
 
   # locks page scrolling to prevent jump to top of the page on refresh
   @scrollLock: (opts = {}) ->
+    now = Date.now()
+    return if @_scrollLockTime && now - @_scrollLockTime < 1000
+    @_scrollLockTime = now
+
     scrollPosition = window.pageYOffset
     body = document.body
     body.style.height = window.getComputedStyle(body).height
@@ -421,7 +425,8 @@ window.Pjax = class Pjax
 
           # scroll to top of the page unless defined otherwise
           unless @opts.scroll == false || Pjax.noScrollCheck(@opts.node)
-            window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+            window.requestAnimationFrame ->
+              window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
           else
             Pjax.scrollLock()
         else

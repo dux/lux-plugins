@@ -1,6 +1,4 @@
 # https://sequel.jeremyevans.net/rdoc/files/doc/model_hooks_rdoc.html
-# call after_change to execute every time object changes
-# (ideal for clearing caches)
 
 module Sequel::Plugins::LuxHooks
   HOOK_METHODS = {}
@@ -9,61 +7,40 @@ module Sequel::Plugins::LuxHooks
     def before_update_exec k, m
       hash = HOOK_METHODS.dig(self.class, k, m) || {}
       hash.values.each do |proc|
-        # @lux_hooks_exec ||= {}
-        # @lux_hooks_exec[k] ||= {}
-        # unless @lux_hooks_exec[k][m]
-          instance_exec m, k, &proc
-        # end
-        # @lux_hooks_exec[k][m] = true
+        instance_exec m, k, &proc
       end
     end
 
     def before_create
-      before_update_exec :b, :c
+      @is_new = true
+      before_update_exec :b, :c unless self.id
       super
     end
 
     def after_create
       before_update_exec :a, :c
-      after_change
       super
     end
 
     def before_update
+      # rr HOOK_METHODS[self.class]
       before_update_exec :b, :u
       super
     end
 
     def after_update
       before_update_exec :a, :u
-      after_change
-      super
-    end
-
-    def before_save
-      before_update_exec :b, :c
-      before_update_exec :b, :u
-      super
-    end
-
-    def after_save
-      before_update_exec :a, :c
-      before_update_exec :a, :u
       super
     end
 
     def before_destroy
       before_update_exec :b, :d
-      after_change
       super
     end
 
     def after_destroy
       before_update_exec :a, :d
       super
-    end
-
-    def after_change
     end
   end
 
@@ -74,15 +51,16 @@ module Sequel::Plugins::LuxHooks
       :after_create,
       :before_update,
       :after_update,
-      :before_save,
-      :after_save,
       :before_destroy,
-      :after_destroy,
-      :after_change
+      :after_destroy
     ].each do |el|
       eval %[
         def #{el} &block
           define_method :#{el} do
+            if :#{el} != :validate && caller[0].include?('gems/sequel')
+              raise "#{el} called directly, you need to call via proxy. Example: before(:cu) { ... }"
+            end
+
             instance_exec &block
             super()
           end
